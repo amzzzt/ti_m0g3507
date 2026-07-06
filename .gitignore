@@ -1,0 +1,11 @@
+# CCS 编译产物
+Debug/
+
+# IDE 缓存
+.clangd/
+
+# VSCode 配置（含个人路径）
+.vscode/
+
+# 生成的 html
+README.html
