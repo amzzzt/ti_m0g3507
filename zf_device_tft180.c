@@ -48,12 +48,13 @@
 *                   ------------------------------------
 ********************************************************************************************************************/
 
-#include "zf_common_clock.h"
-#include "zf_common_debug.h"
+#include "ti_msp_dl_config.h"
+#include "delay.h"
 #include "zf_common_font.h"
 #include "zf_common_function.h"
-#include "zf_driver_delay.h"
-#include "zf_driver_spi.h"
+#include <string.h>
+
+#define zf_assert(x)
 
 #include "zf_device_tft180.h"
 
@@ -66,8 +67,6 @@ static tft180_font_size_enum    tft180_display_font = TFT180_DEFAULT_DISPLAY_FON
 static uint8                    tft180_x_max        = 160;
 static uint8                    tft180_y_max        = 128;
 
-#if TFT180_USE_SOFT_SPI
-static soft_spi_info_struct             tft180_spi;
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     TFT180 SPI 写 8bit 数据
 // 参数说明     data            数据
@@ -75,7 +74,11 @@ static soft_spi_info_struct             tft180_spi;
 // 使用示例     tft180_write_8bit_data(dat);
 // 备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_8bit_data(data)                (soft_spi_write_8bit(&tft180_spi, (data)))
+static void tft180_spi_write8 (uint8_t data)
+{
+    DL_SPI_transmitDataBlocking8(TFT_INST, data);
+}
+#define tft180_write_8bit_data(data)                (tft180_spi_write8(data))
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     TFT180 SPI 写 8bit 数据数组
@@ -85,7 +88,15 @@ static soft_spi_info_struct             tft180_spi;
 // 使用示例     tft180_write_8bit_data_array(data, len);
 // 备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_8bit_data_array(data, len)     (soft_spi_write_8bit_array(&tft180_spi, (data), (len)))
+static void tft180_spi_write8_array (const uint8_t *data, uint32_t len)
+{
+    uint32_t i;
+    for (i = 0; i < len; i++)
+    {
+        DL_SPI_transmitDataBlocking8(TFT_INST, data[i]);
+    }
+}
+#define tft180_write_8bit_data_array(data, len)     (tft180_spi_write8_array((const uint8_t *)(data), (len)))
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     TFT180 SPI 写 16bit 数据
@@ -94,7 +105,12 @@ static soft_spi_info_struct             tft180_spi;
 // 使用示例     tft180_write_16bit_data(x1 + 52);
 // 备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_16bit_data(data)               (soft_spi_write_16bit(&tft180_spi, (data)))
+static void tft180_spi_write16 (uint16_t data)
+{
+    DL_SPI_transmitDataBlocking8(TFT_INST, (uint8_t)(data >> 8));
+    DL_SPI_transmitDataBlocking8(TFT_INST, (uint8_t)(data & 0xFF));
+}
+#define tft180_write_16bit_data(data)               (tft180_spi_write16(data))
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     TFT180 SPI 写 16bit 数据数组
@@ -104,46 +120,16 @@ static soft_spi_info_struct             tft180_spi;
 // 使用示例     tft180_write_16bit_data_array(data, len);
 // 备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_16bit_data_array(data, len)    (soft_spi_write_16bit_array(&tft180_spi, (data), (len)))
-#else
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     TFT180 SPI 写 8bit 数据
-// 参数说明     data            数据
-// 返回参数     void
-// 使用示例     tft180_write_8bit_data(dat);
-// 备注信息     内部调用
-//-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_8bit_data(data)                (spi_write_8bit(TFT180_SPI, (data)))
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     TFT180 SPI 写 8bit 数据数组
-// 参数说明     *data           数据
-// 参数说明     len             数据长度
-// 返回参数     void
-// 使用示例     tft180_write_8bit_data_array(data, len);
-// 备注信息     内部调用
-//-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_8bit_data_array(data, len)     (spi_write_8bit_array(TFT180_SPI, (data), (len)))
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     TFT180 SPI 写 16bit 数据
-// 参数说明     data            数据
-// 返回参数     void
-// 使用示例     ips114_write_16bit_data(x1 + 52);
-// 备注信息     内部调用
-//-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_16bit_data(data)               (spi_write_16bit(TFT180_SPI, (data)))
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     TFT180 SPI 写 16bit 数据数组
-// 参数说明     *data           数据
-// 参数说明     len             数据长度
-// 返回参数     void
-// 使用示例     tft180_write_16bit_data_array(data, len);
-// 备注信息     内部调用
-//-------------------------------------------------------------------------------------------------------------------
-#define tft180_write_16bit_data_array(data, len)    (spi_write_16bit_array(TFT180_SPI, (data), (len)))
-#endif
+static void tft180_spi_write16_array (const uint16_t *data, uint32_t len)
+{
+    uint32_t i;
+    for (i = 0; i < len; i++)
+    {
+        DL_SPI_transmitDataBlocking8(TFT_INST, (uint8_t)(data[i] >> 8));
+        DL_SPI_transmitDataBlocking8(TFT_INST, (uint8_t)(data[i] & 0xFF));
+    }
+}
+#define tft180_write_16bit_data_array(data, len)    (tft180_spi_write16_array((const uint16_t *)(data), (len)))
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     写命令
@@ -224,34 +210,7 @@ static void tft180_set_region (uint16 x1, uint16 y1, uint16 x2, uint16 y2)
 //-------------------------------------------------------------------------------------------------------------------
 static void tft180_debug_init (void)
 {
-    debug_output_struct info;
-    debug_output_struct_init(&info);
-
-    info.type_index = 1;
-    info.display_x_max = tft180_x_max;
-    info.display_y_max = tft180_y_max;
-
-    switch(tft180_display_font)
-    {
-        case TFT180_6X8_FONT:
-        {
-            info.font_x_size = 6;
-            info.font_y_size = 8;
-        }break;
-        case TFT180_8X16_FONT:
-        {
-            info.font_x_size = 8;
-            info.font_y_size = 16;
-        }break;
-        case TFT180_16X16_FONT:
-        {
-            // 暂不支持
-        }break;
-    }
-    info.output_screen = tft180_show_string;
-    info.output_screen_clear = tft180_clear;
-        
-    debug_output_init(&info);
+    // 调试输出框架暂未移植，保留空函数占位
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -956,16 +915,11 @@ void tft180_show_chinese (uint16 x, uint16 y, uint8 size, const uint8 *chinese_b
 //-------------------------------------------------------------------------------------------------------------------
 void tft180_init (void)
 {
-#if TFT180_USE_SOFT_SPI
-    soft_spi_init(&tft180_spi, 0, TFT180_SOFT_SPI_DELAY, TFT180_SCL_PIN, TFT180_SDA_PIN, SOFT_SPI_PIN_NULL, SOFT_SPI_PIN_NULL);
-#else
-    spi_init(TFT180_SPI, SPI_MODE0, TFT180_SPI_SPEED, TFT180_SCL_PIN, TFT180_SDA_PIN, SPI_MISO_NULL, SPI_CS_NULL);
-#endif
-
-    gpio_init(TFT180_DC_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    gpio_init(TFT180_RES_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    gpio_init(TFT180_CS_PIN, GPO, GPIO_HIGH, GPO_PUSH_PULL);
-    gpio_init(TFT180_BL_PIN, GPO, GPIO_HIGH, GPO_PUSH_PULL);
+    // SPI 和 GPIO 均已由 SYSCFG_DL_init() 初始化
+    // 但 syscfg 默认输出 LOW，此处设置正确的初始电平
+    TFT180_CS(1);       // 片选拉高空闲
+    TFT180_BLK(1);      // 背光打开
+    TFT180_DC(0);       // 命令模式
 
     tft180_set_dir(tft180_display_dir);
     tft180_set_color(tft180_pencolor, tft180_bgcolor);

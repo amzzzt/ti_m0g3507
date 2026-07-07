@@ -11,8 +11,11 @@
  */
 const GPIO   = scripting.addModule("/ti/driverlib/GPIO", {}, false);
 const GPIO1  = GPIO.addInstance();
+const GPIO2  = GPIO.addInstance();
 const I2C    = scripting.addModule("/ti/driverlib/I2C", {}, false);
 const I2C1   = I2C.addInstance();
+const SPI    = scripting.addModule("/ti/driverlib/SPI", {}, false);
+const SPI1   = SPI.addInstance();
 const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
 
 /**
@@ -42,9 +45,20 @@ GPIO1.associatedPins.create(2);
 GPIO1.associatedPins[0].$name       = "LED_0";
 GPIO1.associatedPins[0].pin.$assign = "PB22";
 GPIO1.associatedPins[1].$name       = "LED_1";
-GPIO1.associatedPins[1].pin.$assign = "PB11";
+GPIO1.associatedPins[1].pin.$assign = "PB21";
 
 const Board = scripting.addModule("/ti/driverlib/Board", {}, false);
+
+GPIO2.$name                         = "TFT_3";
+GPIO2.associatedPins.create(4);
+GPIO2.associatedPins[0].$name       = "RES";
+GPIO2.associatedPins[0].pin.$assign = "PB10";
+GPIO2.associatedPins[1].$name       = "DC";
+GPIO2.associatedPins[1].pin.$assign = "PB11";
+GPIO2.associatedPins[2].$name       = "CS";
+GPIO2.associatedPins[2].pin.$assign = "PB14";
+GPIO2.associatedPins[3].$name       = "BLK";
+GPIO2.associatedPins[3].pin.$assign = "PB26";
 
 I2C1.$name                             = "OLED";
 I2C1.basicEnableController             = true;
@@ -69,6 +83,28 @@ I2C1.sclPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
 I2C1.sclPinConfig.enableConfig         = true;
 I2C1.sclPinConfig.internalResistor     = "PULL_UP";
 
+SPI1.$name                              = "TFT";
+SPI1.peripheral.$assign                 = "SPI1";
+SPI1.peripheral.sclkPin.$assign         = "PB9";
+SPI1.peripheral.mosiPin.$assign         = "PB8";
+SPI1.sclkPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric2";
+SPI1.sclkPinConfig.direction            = scripting.forceWrite("OUTPUT");
+SPI1.sclkPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+SPI1.sclkPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+SPI1.mosiPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric3";
+SPI1.mosiPinConfig.direction            = scripting.forceWrite("OUTPUT");
+SPI1.mosiPinConfig.hideOutputInversion  = scripting.forceWrite(false);
+SPI1.mosiPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+SPI1.mosiPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+SPI1.misoPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric4";
+SPI1.misoPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+SPI1.misoPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+SPI1.cs0PinConfig.$name                 = "ti_driverlib_gpio_GPIOPinGeneric5";
+SPI1.cs0PinConfig.direction             = scripting.forceWrite("OUTPUT");
+SPI1.cs0PinConfig.hideOutputInversion   = scripting.forceWrite(false);
+SPI1.cs0PinConfig.onlyInternalResistor  = scripting.forceWrite(false);
+SPI1.cs0PinConfig.passedPeripheralType  = scripting.forceWrite("Digital");
+
 SYSCTL.forceDefaultClkConfig = true;
 SYSCTL.clockTreeEn           = true;
 
@@ -84,3 +120,5 @@ Board.peripheral.$suggestSolution                  = "DEBUGSS";
 Board.peripheral.swclkPin.$suggestSolution         = "PA20";
 Board.peripheral.swdioPin.$suggestSolution         = "PA19";
 I2C1.peripheral.$suggestSolution                   = "I2C0";
+SPI1.peripheral.misoPin.$suggestSolution           = "PA16";
+SPI1.peripheral.cs0Pin.$suggestSolution            = "PA2";

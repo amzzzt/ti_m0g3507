@@ -31,18 +31,23 @@
  */
 
 #include "ti_msp_dl_config.h"
-#include "delay.h" 
+#include "delay.h"
 #include "oled.h"
+#include "zf_device_tft180.h"
 
 int main(void)
-{   
+{
     SYSCFG_DL_init();
     OLED_Init();
     OLED_ColorTurn(0);
     OLED_DisplayTurn(0);
     OLED_Clear();
 
-    SYSCFG_DL_init();
+    tft180_init();
+    tft180_set_dir(TFT180_CROSSWISE);
+    tft180_set_color(RGB565_RED, RGB565_WHITE);
+    tft180_clear();
+    tft180_show_string(0, 0, "TFT180 OK!");
 
     while (1) {
         OLED_ShowString(0,0,(u8 *)"Hello,World",16);

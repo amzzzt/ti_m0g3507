@@ -51,38 +51,43 @@
 #ifndef _zf_device_tft180_h_
 #define _zf_device_tft180_h_
 
-#include "zf_common_typedef.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include "ti_msp_dl_config.h"
+#include "zf_common_font.h"
 
-#define TFT180_USE_SOFT_SPI             ( 0 )                           //只能使用硬件SPI        // 默认使用硬件 SPI 方式驱动 建议使用硬件 SPI 方式驱动
-#if TFT180_USE_SOFT_SPI                                                         // 这两段 颜色正常的才是正确的 颜色灰的就是没有用的
-//====================================================软件 SPI 驱动====================================================
-#define TFT180_SOFT_SPI_DELAY           ( 100 )                                 // 软件 SPI 的时钟延时周期 数值越小 SPI 通信速率越快
-#define TFT180_SCL_PIN                  ( A12 )                                 // 软件 SPI SCK 引脚
-#define TFT180_SDA_PIN                  ( A9  )                                 // 软件 SPI MOSI 引脚
-//====================================================软件 SPI 驱动====================================================
-#else
-//====================================================硬件 SPI 驱动====================================================
-#define TFT180_SPI_SPEED                ( 30 * 1000 * 1000 )                    // 硬件 SPI 速率
-#define TFT180_SPI                      ( SPI_0            )                    // 硬件 SPI 号
-#define TFT180_SCL_PIN                  ( SPI0_SCK_A12     )                    // 硬件 SPI SCK 引脚
-#define TFT180_SDA_PIN                  ( SPI0_MOSI_A9     )                    // 硬件 SPI MOSI 引脚
-//====================================================硬件 SPI 驱动====================================================
-#endif
+// 类型别名（原 zf_common_typedef.h 提供的短类型名）
+typedef uint8_t     uint8;
+typedef uint16_t    uint16;
+typedef uint32_t    uint32;
+typedef int32_t     int32;
+typedef int16_t     int16;
 
-#define TFT180_RES_PIN                  ( A7 )                                 	// 液晶复位引脚定义
-#define TFT180_DC_PIN                   ( A15 )                                 // 液晶命令位引脚定义
-#define TFT180_CS_PIN                   ( A8  )                                 // CS 片选引脚
-#define TFT180_BL_PIN                   ( A13 )                                 // 液晶背光引脚定义
+#define TFT180_USE_SOFT_SPI             ( 0 )                           // 固定使用硬件 SPI（MSPM0 DriverLib）
+
+//====================================================硬件 SPI 驱动====================================================
+#define TFT180_SPI                      ( TFT_INST )                            // 来自 syscfg 生成的宏
+//====================================================硬件 SPI 驱动====================================================
+
+// 引脚宏 来自 syscfg 生成
+#define TFT180_RES_PORT                 ( TFT_3_PORT    )
+#define TFT180_RES_PIN                  ( TFT_3_RES_PIN )
+#define TFT180_DC_PORT                  ( TFT_3_PORT    )
+#define TFT180_DC_PIN                   ( TFT_3_DC_PIN  )
+#define TFT180_CS_PORT                  ( TFT_3_PORT    )
+#define TFT180_CS_PIN                   ( TFT_3_CS_PIN  )
+#define TFT180_BL_PORT                  ( TFT_3_PORT    )
+#define TFT180_BL_PIN                   ( TFT_3_BLK_PIN )
 
 #define TFT180_DEFAULT_DISPLAY_DIR      ( TFT180_PORTAIT   )                    // 默认的显示方向
 #define TFT180_DEFAULT_PENCOLOR         ( RGB565_RED       )                    // 默认的画笔颜色
 #define TFT180_DEFAULT_BGCOLOR          ( RGB565_WHITE     )                    // 默认的背景颜色
 #define TFT180_DEFAULT_DISPLAY_FONT     ( TFT180_8X16_FONT )                    // 默认的字体模式
 
-#define TFT180_DC(x)                    ((x) ? (gpio_high(TFT180_DC_PIN)) : (gpio_low(TFT180_DC_PIN)))
-#define TFT180_RST(x)                   ((x) ? (gpio_high(TFT180_RES_PIN)) : (gpio_low(TFT180_RES_PIN)))
-#define TFT180_CS(x)                    ((x) ? (gpio_high(TFT180_CS_PIN)) : (gpio_low(TFT180_CS_PIN)))
-#define TFT180_BLK(x)                   ((x) ? (gpio_high(TFT180_BL_PIN)) : (gpio_low(TFT180_BL_PIN)))
+#define TFT180_DC(x)                    ((x) ? DL_GPIO_setPins(TFT180_DC_PORT, TFT180_DC_PIN) : DL_GPIO_clearPins(TFT180_DC_PORT, TFT180_DC_PIN))
+#define TFT180_RST(x)                   ((x) ? DL_GPIO_setPins(TFT180_RES_PORT, TFT180_RES_PIN) : DL_GPIO_clearPins(TFT180_RES_PORT, TFT180_RES_PIN))
+#define TFT180_CS(x)                    ((x) ? DL_GPIO_setPins(TFT180_CS_PORT, TFT180_CS_PIN) : DL_GPIO_clearPins(TFT180_CS_PORT, TFT180_CS_PIN))
+#define TFT180_BLK(x)                   ((x) ? DL_GPIO_setPins(TFT180_BL_PORT, TFT180_BL_PIN) : DL_GPIO_clearPins(TFT180_BL_PORT, TFT180_BL_PIN))
 
 typedef enum
 {
