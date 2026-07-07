@@ -31,15 +31,27 @@
  */
 
 #include "ti_msp_dl_config.h"
- 
+#include "delay.h" 
+#include "oled.h"
+
 int main(void)
-{
+{   
+    SYSCFG_DL_init();
+    OLED_Init();
+    OLED_ColorTurn(0);
+    OLED_DisplayTurn(0);
+    OLED_Clear();
+
     SYSCFG_DL_init();
 
     while (1) {
-        system_delay_ms(300);
+        OLED_ShowString(0,0,(u8 *)"Hello,World",16);
+        OLED_Refresh();
+        delay_cycles(8000000);
         DL_GPIO_clearPins(LED_PORT,LED_LED_0_PIN);
-        system_delay_ms(300);
+        DL_GPIO_clearPins(LED_PORT,LED_LED_1_PIN);
+        delay_cycles(8000000);
         DL_GPIO_setPins(LED_PORT,LED_LED_0_PIN);
+        DL_GPIO_setPins(LED_PORT,LED_LED_1_PIN);
     }
 }
