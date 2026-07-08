@@ -6,7 +6,7 @@
 
 #define KEY_RELEASE_LEVEL      1        // 上拉: 释放=HIGH, 按下=LOW
 #define KEY_MAX_SHOCK_PERIOD   5        // 消抖 ms
-#define KEY_LONG_PRESS_PERIOD  1000     // 长按阈值 ms
+#define KEY_LONG_PRESS_PERIOD  800     // 长按阈值 ms
 
 typedef enum {
     KEY_1, KEY_2, KEY_3, KEY_4,
