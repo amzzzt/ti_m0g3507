@@ -35,6 +35,7 @@
 #include "oled.h"
 #include "zf_device_tft180.h"
 #include "uart_print.h"
+#include "wireless_uart.h"
 #include <stdio.h>
 
 // 正弦波查找表 (128 点, 0~255, 精确计算)
@@ -67,6 +68,9 @@ int main(void)
     tft180_clear();
     tft180_show_string(0, 0, "TFT180 OK!");
 
+    wireless_uart_init();
+    tft180_show_string(0, 32, "Wireless init OK");
+
     while (1) {
         OLED_ShowString(0,0,(u8 *)"Hello,World",16);
         OLED_Refresh();
@@ -82,17 +86,27 @@ int main(void)
         uint32_t ch3 = ((tick / 32) & 1) ? 5000u : 0u;                // 方波: 0/5000 跳变
         uint32_t ch4 = 3000u + ((tick * 3) % 2000);                    // 斜波: 3000~5000
 
-        int len = sprintf(vofa_buf, "%lu,%lu,%lu,%lu,%lu\r\n",
-                          ch0, ch1, ch2, ch3, ch4);
+        sprintf(vofa_buf, "%u,%u,%u,%u,%u\r\n",
+                ch0, ch1, ch2, ch3, ch4);
         uart_send_string(vofa_buf);
 
         // TFT180 显示数据
         char tft_str[32];
-        sprintf(tft_str, "ch:%lu %lu", ch0, tick);
+        sprintf(tft_str, "ch:%u %u", ch0, tick);
         tft180_set_color(RGB565_BLUE, RGB565_WHITE);
         tft180_show_string(0, 16, tft_str);
 
-        system_delay_ms(10);                            // ~100Hz 刷新
+        // 无线串口: 每帧都发 (200Hz, 跟 VOFA 同速率)
+        wireless_uart_send_string(vofa_buf);
+        if (wireless_uart_available()) {
+            uint8_t rx = wireless_uart_read_byte();
+            char rx_str[16];
+            sprintf(rx_str, "RX:0x%02X", rx);
+            tft180_set_color(RGB565_RED, RGB565_WHITE);
+            tft180_show_string(0, 48, rx_str);
+        }
+
+        system_delay_ms(5);                             // ~200Hz 刷新
         DL_GPIO_togglePins(LED_PORT, LED_LED_0_PIN);
     }
 }
