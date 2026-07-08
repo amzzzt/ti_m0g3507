@@ -32,7 +32,7 @@ static uint8_t fifo_pop(void) {
 }
 
 // ---- 超时计数 ----
-#define TIMEOUT_MS  5
+#define TIMEOUT_MS  1
 
 // ---- 底层: 等待 RTS 就绪 (LOW = 模块空闲) ----
 static bool rts_wait_ready(void)
