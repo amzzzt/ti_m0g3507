@@ -1,11 +1,12 @@
-# CCS 编译产物
-Debug/
-
-# IDE 缓存
-.clangd/
-
-# VSCode 配置（含个人路径）
-.vscode/
-
-# 生成的 html
-README.html
+project/mdk/JLinkLog.txt
+project/mdk/Listings/
+project/mdk/Objects/
+project/mdk/*.uvguix.*
+*.o
+*.d
+*.crf
+*.dep
+*.axf
+*.hex
+*.htm
+*.map
