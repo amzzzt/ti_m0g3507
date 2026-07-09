@@ -4,37 +4,22 @@
  * ======================== 工作原理 ========================
  *
  * 1. PWM 硬件自动运行 (syscfg 配置):
- *    TIMG8 产生 PWM 信号, CCP1 比较值决定脉宽
- *    比较值 SERVO_MIN(0°) ~ SERVO_MAX(180°) 对应 0.5ms~2.5ms
- *    写入 CCP1 比较寄存器 → 下一个 PWM 周期生效 → 舵机转动
+ *    TIMG8 计数器以 100kHz 从 0 计数到 1999, 每 2000 次 = 20ms = 一个 PWM 周期(50Hz)
+ *    CCP1 比较值决定脉宽: 50(0.5ms) ~ 250(2.5ms)
  *
- * 2. 角度控制 (servo_set_angle):
- *    输入 0~180°, 线性映射到 SERVO_MIN ~ SERVO_MAX (计数比较值)
- *
- * 3. 扫动计时 (servo_sweep):
- *    使用独立 TIMA0 1ms 节拍 (tick_get), 每 20ms 走 1°
- *    TIMG8 只管 PWM 输出, 不读计数器, 不绕回检测
- *    纯中断驱动, 无阻塞、无忙等
- *
- * 4. MG996R 调参:
- *    先把角度设 0°, 调大 SERVO_MIN 直到舵机刚停下不动
- *    再把角度设 180°, 调小 SERVO_MAX 直到舵机刚停下不动
- *    这两个值就是你的舵机实际可用范围
+ * 2. 扫动计时 (servo_sweep):
+ *    读 TIMG8 自己的计数器, cnt < last_cnt → 绕回 → 20ms 过去了
+ *    一个定时器既输出 PWM 又计时, 无额外外设
  */
 #include "servo.h"
-#include "tick.h"
 
-/* ---------- 舵机参数 ---------- */
 #define SERVO_MIN  50     /* 0.5ms × 100kHz */
 #define SERVO_MAX  250    /* 2.5ms × 100kHz */
 
-/* ---------- 扫动状态 ---------- */
-static int angle = 0;
-static int dir   = 1;
+static int      angle    = 0;
+static int      dir      = 1;
+static uint16_t last_cnt = 0;
 
-/* ===========================================================
- * servo_set_angle — 设置舵机角度
- * =========================================================== */
 void servo_set_angle(uint8_t deg)
 {
     if (deg > 180) deg = 180;
@@ -45,17 +30,15 @@ void servo_set_angle(uint8_t deg)
     DL_TimerG_setCaptureCompareValue(SERVO_INST, val, GPIO_SERVO_C1_IDX);
 }
 
-/* ===========================================================
- * servo_sweep — 主循环调用, 1ms tick 计时, 每 20ms 走 1°
- * =========================================================== */
 void servo_sweep(void)
 {
-    static uint32_t last_tick = 0;
-    uint32_t now = tick_get();
+    uint16_t cnt = (uint16_t)DL_TimerG_getTimerCount(SERVO_INST);
 
-    if (now - last_tick >= 20) {
-        last_tick = now;
-
+    /*
+     * 计数器: 0→1→...→1999→0→1→...
+     * cnt < last_cnt → 绕回 → 一个 PWM 周期 (20ms) 结束 → 走 1°
+     */
+    if (cnt < last_cnt) {
         angle += dir;
 
         if (angle >= 180) { angle = 180; dir = -1; }
@@ -63,14 +46,13 @@ void servo_sweep(void)
 
         servo_set_angle(angle);
     }
+    last_cnt = cnt;
 }
 
-/* ===========================================================
- * servo_init — 上电归中
- * =========================================================== */
 void servo_init(void)
 {
-    angle = 90;
-    dir   = 1;
+    angle    = 90;
+    dir      = 1;
     servo_set_angle(90);
+    last_cnt = (uint16_t)DL_TimerG_getTimerCount(SERVO_INST);
 }
