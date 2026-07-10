@@ -442,6 +442,16 @@
               <FileType>1</FileType>
               <FilePath>..\user\src\bsp_sr04.c</FilePath>
             </File>
+            <File>
+              <FileName>radar.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\radar.c</FilePath>
+            </File>
+            <File>
+              <FileName>radar.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\radar.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

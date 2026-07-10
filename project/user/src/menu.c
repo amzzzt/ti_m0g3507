@@ -6,6 +6,7 @@
 #include "zf_common_headfile.h"
 #include "tick.h"
 #include "bsp_sr04.h"
+#include "radar.h"
 #include <stdio.h>
 
 typedef enum { PAGE_NORMAL, PAGE_MENU_MAIN, PAGE_ROTATE } page_t;
@@ -40,9 +41,7 @@ static void draw_menu(void)
 static void draw_normal(void)
 {
     __disable_irq();
-    tft180_set_color(RGB565_BLACK, RGB565_WHITE);
-    tft180_clear();
-    tft180_show_string(0, 0, "TFT180 OK");
+    radar_draw_base();
     __enable_irq();
 }
 
