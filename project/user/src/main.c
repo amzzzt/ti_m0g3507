@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "tick.h"
+#include "menu.h"
 #include "bsp_sr04.h"
 #include <stdio.h>
 
@@ -7,20 +8,19 @@ int main (void)
 {
     clock_init(SYSTEM_CLOCK_80M);
     tick_init();
+    key_init(1);
+    tft180_init();
     wireless_uart_init();
     sr04_init();
+    menu_init();
 
-    gpio_init(B22, GPO, GPIO_LOW, GPO_PUSH_PULL);
-    gpio_high(B22);   // 上电亮灯 = 新程序已烧入
+    tft180_set_dir(TFT180_CROSSWISE);
+    tft180_set_color(RGB565_BLACK, RGB565_WHITE);
+    tft180_clear();
+    tft180_show_string(0, 0, "TFT180 OK");
 
     while (true)
-    {
-        if (sr04_send_flag) {
-            sr04_send_flag = 0;
-            float v = sr04_read();
-            char buf[32];
-            sprintf(buf, "%.1f\r\n", (double)v);
-            wireless_uart_send_string(buf);
-        }
-    }
+     { 
+        menu_run(); 
+     }
 }
