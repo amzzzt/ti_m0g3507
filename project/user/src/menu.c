@@ -7,6 +7,7 @@
 #include "tick.h"
 #include "bsp_sr04.h"
 #include "radar.h"
+#include "servo.h"
 #include <stdio.h>
 
 typedef enum { PAGE_NORMAL, PAGE_MENU_MAIN, PAGE_ROTATE } page_t;
@@ -49,6 +50,14 @@ static void draw_normal(void)
 void menu_run(void)
 {
     uint32_t now = tick_get();
+
+    // 扫描线: 每40ms跟新舵机位置
+    static uint32_t scan_tick = 0;
+    if (now - scan_tick >= 40) {
+        scan_tick = now;
+        radar_draw_scanline(servo_get_angle());
+    }
+
     if (now - last_tick < 20) return;
 
     switch (page) {

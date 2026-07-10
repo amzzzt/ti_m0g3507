@@ -16,6 +16,9 @@
 static int angle = 0;
 static int dir   = 1;
 
+// ============================== 读取角度 ==============================
+uint8_t servo_get_angle(void) { return (uint8_t)angle; }
+
 // ============================== 初始化 ==============================
 
 void servo_init(void)

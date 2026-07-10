@@ -3,22 +3,23 @@
  */
 #include "radar.h"
 #include "zf_common_headfile.h"
+#include "tick.h"
 
 // sin(0°~90°)×256, 91项 (索引=角度)
 static const int16_t st[]={
-    0,4,9,13,18,22,27,31,36,40,45,49,54,58,63,67,
-    72,76,80,85,89,93,98,102,106,110,114,118,122,126,130,134,
-    138,142,145,149,153,156,160,163,167,170,173,177,180,183,186,189,
-    192,195,197,200,203,205,208,210,213,215,217,219,221,223,225,227,
-    229,230,232,233,235,236,237,239,240,241,242,243,244,245,246,247,
-    247,248,249,249,250,250,251,251,252,252,252,253,253,253,254,256
+    0,4,9,13,18,22,27,31,36,40,44,49,53,58,62,66,
+    71,75,79,83,88,92,96,100,104,108,112,116,120,124,128,132,
+    136,139,143,147,150,154,158,161,165,168,171,175,178,181,184,187,
+    190,193,196,199,202,204,207,210,212,215,217,219,222,224,226,228,
+    230,232,234,236,237,239,241,242,243,245,246,247,248,249,250,251,
+    252,253,254,254,255,255,255,256,256,256,256
 };
 static int16_t S(int d){d%=360;if(d<0)d+=360;if(d<=90)return st[d];if(d<=180)return st[180-d];if(d<=270)return -st[d-180];return -st[360-d];}
 static int16_t C(int d){return S(d+90);}
 
 void radar_draw_base(void)
 {
-    uint16_t dim=0x0120, mid=0x0380;   // 内圈更暗   // 内圈暗, 外圈中暗
+    uint16_t dim=0x0120, mid=0x0380;
     int rr[]={14,29,43,58,72};
     int i,a,x;
 
@@ -46,6 +47,115 @@ void radar_draw_base(void)
         int ex=RADAR_CX+(72*C(ang[i]))/256;
         int ey=RADAR_CY-(72*S(ang[i]))/256;
         tft180_draw_line(RADAR_CX,RADAR_CY,(uint16)ex,(uint16)ey,dim);
+    }
+}
+
+#define TRAIL_LEN 18   // 拖尾长度 (帧数), 18帧×40ms=720ms, 约36°
+
+// ---- 局部刷新: 恢复弧线/底线/圆心 (角度线在拖尾之后画) ----
+static void repair_angle(uint8_t deg)
+{
+    uint16_t dim = 0x0120, mid = 0x0380;
+    int rr[] = {14, 29, 43, 58, 72};
+    uint16_t cr[] = {dim, dim, dim, dim, mid};
+
+    // 1) 恢复5圈弧线: deg-1 ~ deg+1
+    for (int i = 0; i < 5; i++) {
+        for (int da = -1; da <= 1; da++) {
+            int a = (int)deg + da;
+            if (a < 0) a = 0;
+            if (a > 180) a = 180;
+            int x = RADAR_CX + (rr[i] * C(a)) / 256;
+            int y = RADAR_CY - (rr[i] * S(a)) / 256;
+            if (x >= 0 && x < 160 && y >= 0 && y < 128)
+                tft180_draw_point((uint16)x, (uint16)y, cr[i]);
+        }
+    }
+
+    // 2) 恢复底线: 0~3° 补右半段, 177~180° 补左半段
+    if (deg <= 3) {
+        for (int x = RADAR_CX; x <= RADAR_CX + RADAR_R; x++)
+            tft180_draw_point((uint16)x, (uint16)RADAR_CY, mid);
+    } else if (deg >= 177) {
+        for (int x = RADAR_CX - RADAR_R; x <= RADAR_CX; x++)
+            tft180_draw_point((uint16)x, (uint16)RADAR_CY, mid);
+    }
+
+    // 3) 圆心
+    tft180_draw_point((uint16)RADAR_CX, (uint16)RADAR_CY, mid);
+}
+
+// ---- 判断是否标记角度 ----
+static inline int is_marked(uint8_t deg)
+{
+    return (deg == 30 || deg == 60 || deg == 90 || deg == 120 || deg == 150);
+}
+
+void radar_draw_scanline(uint8_t deg)
+{
+    static uint8_t  trail[TRAIL_LEN];
+    static uint8_t  trail_age[TRAIL_LEN];
+    static uint8_t  trail_cnt = 0;
+    static uint8_t  last_deg  = 255;
+    static uint32_t last_base = 0;
+
+    uint32_t now = tick_get();
+    uint8_t  repair_ang = 255;   // 需要在拖尾后修复的角度线
+
+    // 安全阀: 每 60 秒全刷一次
+    if (now - last_base > 60000) {
+        last_base = now;
+        radar_draw_base();
+        trail_cnt = 0;
+        last_deg  = 255;
+        return;
+    }
+
+    // ---- 老化: age+1, 超限则修复底图后踢出 ----
+    {
+        int w = 0;
+        for (int i = 0; i < trail_cnt; i++) {
+            trail_age[i]++;
+            if (trail_age[i] >= TRAIL_LEN) {
+                repair_angle(trail[i]);          // 弧线 + 底线 + 圆心
+                if (is_marked(trail[i]))
+                    repair_ang = trail[i];       // 角度线拖尾后再画
+            } else {
+                trail[w]     = trail[i];
+                trail_age[w] = trail_age[i];
+                w++;
+            }
+        }
+        trail_cnt = w;
+    }
+
+    // ---- 存入新位置 ----
+    if (deg != last_deg) {
+        last_deg = deg;
+        trail[trail_cnt]     = deg;
+        trail_age[trail_cnt] = 0;
+        trail_cnt++;
+    }
+
+    // ---- 绘制渐变拖尾 (新→亮, 老→暗) ----
+    for (int i = 0; i < trail_cnt; i++) {
+        int g = 63 - (trail_age[i] * 62) / (TRAIL_LEN - 1);
+        if (g < 1) g = 1;
+        uint16_t color = (uint16_t)(g << 5);
+
+        int nx = RADAR_CX + (72 * C(trail[i])) / 256;
+        int ny = RADAR_CY - (72 * S(trail[i])) / 256;
+        tft180_draw_line(RADAR_CX, RADAR_CY, (uint16)nx, (uint16)ny, color);
+    }
+
+    // ---- 最后画角度线 (拖尾已画完, 不会被相邻线覆盖) ----
+    if (repair_ang != 255) {
+        uint16_t dim = 0x0120, mid = 0x0380;
+        int ex = RADAR_CX + (72 * C(repair_ang)) / 256;
+        int ey = RADAR_CY - (72 * S(repair_ang)) / 256;
+        tft180_draw_line(RADAR_CX, RADAR_CY, (uint16)ex, (uint16)ey, dim);
+        // 画完整条线后圆心可能被覆盖, 补回
+        tft180_draw_point((uint16)RADAR_CX, (uint16)RADAR_CY, mid);
     }
 }
 

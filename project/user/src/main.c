@@ -3,6 +3,7 @@
 #include "menu.h"
 #include "bsp_sr04.h"
 #include "radar.h"
+#include "servo.h"
 
 int main (void)
 {
@@ -11,6 +12,7 @@ int main (void)
     key_init(1);
     tft180_set_dir(TFT180_CROSSWISE);
     tft180_init();
+    servo_init();
     radar_draw_base();
     wireless_uart_init();
     sr04_init();

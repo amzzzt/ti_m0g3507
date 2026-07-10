@@ -11,8 +11,9 @@
 
 #include <stdint.h>
 
-void servo_init(void);
-void servo_set_angle(uint8_t deg);      // 0-180°
-void servo_sweep(void);                 // 主循环调用, 每20ms自动走1°
+void    servo_init(void);
+void    servo_set_angle(uint8_t deg);
+void    servo_sweep(void);
+uint8_t servo_get_angle(void);          // 读取当前角度
 
 #endif
