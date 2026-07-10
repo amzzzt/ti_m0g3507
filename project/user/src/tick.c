@@ -4,7 +4,6 @@
 
 #include "zf_driver_pit.h"
 #include "tick.h"
-#include "servo.h"
 #include "zf_device_key.h"
 
 static volatile uint32_t g_tick_ms;
@@ -15,8 +14,7 @@ static void tick_callback(uint32 event, void *ptr)
     (void)event;
     (void)ptr;
     g_tick_ms++;
-    servo_sweep();                      // 每 1ms 判定, 内部每 20ms 走 1°
-    key_scanner();                      // 每 1ms 扫描按键状态
+    key_scanner();
 }
 
 // ---------- 初始化 ----------

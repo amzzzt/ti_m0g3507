@@ -263,7 +263,7 @@ static void tft180_debug_init (void)
 //-------------------------------------------------------------------------------------------------------------------
 void tft180_clear (void)
 {
-    uint16 color_buffer[tft180_x_max];
+    static uint16 color_buffer[160];    // static 避免栈溢出
     uint16 i = 0, j = 0;
 
     TFT180_CS(0);
@@ -288,7 +288,7 @@ void tft180_clear (void)
 //-------------------------------------------------------------------------------------------------------------------
 void tft180_full (const uint16 color)
 {
-    uint16 color_buffer[tft180_x_max];
+    static uint16 color_buffer[160];    // static 避免栈溢出
     uint16 i = 0, j = 0;
 
     TFT180_CS(0);

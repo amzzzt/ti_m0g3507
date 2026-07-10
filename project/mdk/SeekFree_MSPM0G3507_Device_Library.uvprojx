@@ -422,6 +422,16 @@
               <FileType>5</FileType>
               <FilePath>..\user\inc\servo.h</FilePath>
             </File>
+            <File>
+              <FileName>menu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\menu.c</FilePath>
+            </File>
+            <File>
+              <FileName>menu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\menu.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
