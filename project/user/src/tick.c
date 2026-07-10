@@ -16,13 +16,9 @@ static void tick_callback(uint32 event, void *ptr)
     g_tick_ms++;
 
     if (g_tick_ms >= next_trig) {
-        next_trig = g_tick_ms + 100;
+        next_trig = g_tick_ms + 30;    // 每 30ms
         sr04_trigger();
-        sr04_send_flag = 1;
-    }
-
-    if (sr04_ready()) {
-        sr04_send_flag = 1;
+        sr04_send_flag = 1;            // 触发即发
     }
 }
 
