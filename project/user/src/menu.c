@@ -42,7 +42,9 @@ static void draw_menu(void)
 static void draw_normal(void)
 {
     __disable_irq();
-    radar_draw_base();
+    tft180_set_color(RGB565_WHITE, RGB565_BLACK);
+    tft180_clear();
+    tft180_show_string(40, 56, "TFT180 OK");
     __enable_irq();
 }
 
@@ -51,11 +53,22 @@ void menu_run(void)
 {
     uint32_t now = tick_get();
 
-    // 扫描线: 每40ms跟新舵机位置
-    static uint32_t scan_tick = 0;
-    if (now - scan_tick >= 40) {
-        scan_tick = now;
-        radar_draw_scanline(servo_get_angle());
+    // LED: 滤波距离<30cm → 100ms快闪
+    {
+        static uint32_t led_tick = 0;
+        static uint8_t  led_on   = 0;
+        float d = sr04_read();
+        if (d > 0.0f && d < 20.0f) {
+            if (now - led_tick >= 50) {   // 50ms半周期
+                led_tick = now;
+                led_on = !led_on;
+                if (led_on) gpio_high(LED1_PIN);
+                else        gpio_low(LED1_PIN);
+            }
+        } else {
+            gpio_low(LED1_PIN);
+            led_on = 0;
+        }
     }
 
     if (now - last_tick < 20) return;
@@ -86,12 +99,13 @@ void menu_run(void)
             key_clear_state(KEY_1);
             if (cursor == 0) {
                 page = PAGE_ROTATE;
+                radar_clear_dots();
                 __disable_irq();
-                tft180_set_color(RGB565_BLACK, RGB565_WHITE);
+                tft180_set_color(RGB565_WHITE, RGB565_BLACK);
                 tft180_clear();
                 tft180_show_string(0, 0,  "SR04 Measure");
-                tft180_show_string(0, 24, "KEY1=Start");
-                tft180_show_string(0, 42, "KEY4=Stop/Back");
+                tft180_show_string(0, 16, "KEY1=Start");
+                tft180_show_string(0, 28, "KEY4=Stop/Back");
                 __enable_irq();
             } else {
                 page = PAGE_NORMAL; draw_normal();
@@ -104,13 +118,14 @@ void menu_run(void)
     case PAGE_ROTATE: {
         static uint8_t  active = 0;
         static uint32_t next_trig = 0;
+        static uint32_t scan_tick = 0;
+        static uint8_t  prev_deg  = 0;
 
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
             key_clear_state(KEY_4);
             active = 0;
-            __disable_irq();
-            tft180_show_string(0, 60, "Status: OFF");
-            __enable_irq();
+            servo_disable();
+            radar_clear_dots();
             page = PAGE_MENU_MAIN; draw_menu();
             last_tick = now;
             break;
@@ -120,23 +135,56 @@ void menu_run(void)
             if (KEY_SHORT_PRESS == key_get_state(KEY_1)) {
                 key_clear_state(KEY_1);
                 active = 1;
-                next_trig = now;
-                __disable_irq();
-                tft180_show_string(0, 60, "Status: ON ");
-                __enable_irq();
+                next_trig = now; scan_tick = now;
+                servo_enable();
+                prev_deg = servo_get_angle();
+                radar_clear_dots();
+                radar_scanline_reset();
+                radar_draw_base();
                 last_tick = now;
             }
             break;
         }
 
-        // 测量中 (不操作屏幕, 防止关中断丢 ECHO)
-        if (now - next_trig >= 30) {
-            next_trig = now + 30;
+        // ---- 扫描线+红点+无线 每40ms ----
+        if (now - scan_tick >= 40) {
+            scan_tick = now;
+            uint8_t cur_ang = servo_get_angle();
+            radar_draw_scanline(cur_ang);
+            radar_draw_dots();
+
+            // 逐飞助手: 通道0=角度, 通道1=滤波距离
+            float dist = sr04_read();
+            char buf[32];
+            int d = (int)(dist * 10.0f + 0.5f);
+            sprintf(buf, "%d,%d.%d\r\n", (int)cur_ang, d / 10, d % 10);
+            if (!gpio_get_level(B2))
+                wireless_uart_send_string(buf);
+        }
+
+        // 检测转向 → 180°扫完, 全清屏+红点
+        {
+            uint8_t cur = servo_get_angle();
+            int diff = (int)cur - (int)prev_deg;
+            // prev≥178且角度下降 → 刚过180°; prev≤2且角度上升 → 刚过0°
+            if ((diff < 0 && prev_deg >= 178) || (diff > 0 && prev_deg <= 2)) {
+                radar_clear_dots();
+                radar_scanline_reset();
+                radar_draw_base();
+            }
+            prev_deg = cur;
+        }
+
+        // 测量
+        if (now - next_trig >= 60) {
+            next_trig = now + 60;
             sr04_trigger();
 
-            char buf[20];
-            sprintf(buf, "%.1f\r\n", (double)sr04_read());
-            wireless_uart_send_string(buf);
+            float dist = sr04_read();
+            uint8_t ang = servo_get_angle();
+            if (dist >= 2.0f && dist <= 50.0f) {
+                radar_add_dot(ang, dist);
+            }
         }
     } break;
     }

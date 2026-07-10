@@ -15,6 +15,10 @@
 
 static int angle = 0;
 static int dir   = 1;
+static uint8_t enabled = 0;   // 默认不扫, 等 KEY1 启动
+
+void servo_enable(void)  { enabled = 1; }
+void servo_disable(void) { enabled = 0; }
 
 // ============================== 读取角度 ==============================
 uint8_t servo_get_angle(void) { return (uint8_t)angle; }
@@ -46,10 +50,11 @@ void servo_set_angle(uint8_t deg)
 
 void servo_sweep(void)
 {
+    if (!enabled) return;
     static uint32_t last_tick = 0;
     uint32_t now = tick_get();
 
-    if (now - last_tick < 20) return;   // 不到 20ms, 跳过
+    if (now - last_tick < 20) return;
     last_tick = now;
 
     angle += dir;

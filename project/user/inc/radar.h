@@ -9,6 +9,11 @@
 
 void radar_draw_base(void);
 void radar_draw_point(uint8_t deg, float dist_cm);
-void radar_draw_scanline(uint8_t deg);   // 移动高亮扫描线
+void radar_draw_scanline(uint8_t deg);
+void radar_scanline_reset(void);
+
+void radar_add_dot(uint8_t deg, float cm);   // 记录测距点
+void radar_clear_dots(void);                  // 清空 (扫完 180°)
+void radar_draw_dots(void);                   // 绘制所有点
 
 #endif

@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+#define LED1_PIN  B21
+
 void    menu_init(void);
 void    menu_run(void);
 uint8_t menu_is_active(void);   // 1=菜单中(跳过波形), 0=正常显示

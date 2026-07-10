@@ -43,14 +43,26 @@ void radar_draw_base(void)
 
     // 角度线 30/60/90/120/150 (暗)
     int ang[]={30,60,90,120,150};
+    char *lbl[]={"30","60","90","120","150"};
     for(i=0;i<5;i++){
         int ex=RADAR_CX+(72*C(ang[i]))/256;
         int ey=RADAR_CY-(72*S(ang[i]))/256;
         tft180_draw_line(RADAR_CX,RADAR_CY,(uint16)ex,(uint16)ey,dim);
+        // 标注角度数字 (半径外移 8px)
+        int lx=RADAR_CX+(80*C(ang[i]))/256 - 5;
+        int ly=RADAR_CY-(80*S(ang[i]))/256 - 4;
+        if(lx>=0&&ly>=0&&lx<150&&ly<120){
+            tft180_set_color(mid, RGB565_BLACK);
+            tft180_show_string((uint16)lx, (uint16)ly, lbl[i]);
+        }
     }
 }
 
 #define TRAIL_LEN 18   // 拖尾长度 (帧数), 18帧×40ms=720ms, 约36°
+
+// 红点缓冲区 + 帧龄 (在 scanline 里老化, 超 4 帧自动消失)
+static uint8_t dot_cm[181];
+static uint8_t dot_age[181];
 
 // ---- 局部刷新: 恢复弧线/底线/圆心 (角度线在拖尾之后画) ----
 static void repair_angle(uint8_t deg)
@@ -91,16 +103,23 @@ static inline int is_marked(uint8_t deg)
     return (deg == 30 || deg == 60 || deg == 90 || deg == 120 || deg == 150);
 }
 
+// 扫描线拖尾状态 (文件级, radar_scanline_reset 可访问)
+static uint8_t  trail[TRAIL_LEN];
+static uint8_t  trail_age[TRAIL_LEN];
+static uint8_t  trail_cnt = 0;
+static uint8_t  last_deg  = 255;
+static uint32_t last_base = 0;
+
+void radar_scanline_reset(void)
+{
+    trail_cnt = 0;
+    last_deg  = 255;
+}
+
 void radar_draw_scanline(uint8_t deg)
 {
-    static uint8_t  trail[TRAIL_LEN];
-    static uint8_t  trail_age[TRAIL_LEN];
-    static uint8_t  trail_cnt = 0;
-    static uint8_t  last_deg  = 255;
-    static uint32_t last_base = 0;
-
     uint32_t now = tick_get();
-    uint8_t  repair_ang = 255;   // 需要在拖尾后修复的角度线
+    uint8_t  repair_ang = 255;
 
     // 安全阀: 每 60 秒全刷一次
     if (now - last_base > 60000) {
@@ -111,15 +130,24 @@ void radar_draw_scanline(uint8_t deg)
         return;
     }
 
-    // ---- 老化: age+1, 超限则修复底图后踢出 ----
+    // ---- 红点: 距离当前扫描线 >8° 即刻清除 ----
+    for (int a = 0; a <= 180; a++) {
+        if (dot_cm[a]) {
+            int d = (int)a - (int)deg;
+            if (d < 0) d = -d;
+            if (d > 8) dot_cm[a] = 0;
+        }
+    }
+
+    // ---- 拖尾老化: age+1, 超限则修复底图后踢出 ----
     {
         int w = 0;
         for (int i = 0; i < trail_cnt; i++) {
             trail_age[i]++;
             if (trail_age[i] >= TRAIL_LEN) {
-                repair_angle(trail[i]);          // 弧线 + 底线 + 圆心
+                repair_angle(trail[i]);
                 if (is_marked(trail[i]))
-                    repair_ang = trail[i];       // 角度线拖尾后再画
+                    repair_ang = trail[i];
             } else {
                 trail[w]     = trail[i];
                 trail_age[w] = trail_age[i];
@@ -159,8 +187,42 @@ void radar_draw_scanline(uint8_t deg)
     }
 }
 
+// ==================== 红点操作 ====================
+
+void radar_add_dot(uint8_t deg, float cm)
+{
+    if (deg > 180) return;
+    if (cm < 2.0f || cm > 50.0f) return;
+    dot_cm[deg]  = (uint8_t)(cm + 0.5f);
+    dot_age[deg] = 0;
+}
+
+void radar_clear_dots(void)
+{
+    for (int i = 0; i <= 180; i++) { dot_cm[i] = 0; dot_age[i] = 0; }
+}
+
+void radar_draw_dots(void)
+{
+    for (int a = 0; a <= 180; a++) {
+        if (dot_cm[a] == 0) continue;
+        radar_draw_point((uint8_t)a, (float)dot_cm[a]);
+    }
+}
+
 void radar_draw_point(uint8_t deg, float cm){
     if(cm<1)return; int r=(int)(cm*1.5f); if(r>72)r=72;
     int x=RADAR_CX+(r*C(deg))/256, y=RADAR_CY-(r*S(deg))/256;
-    if(x>0&&x<159&&y>0&&y<127)tft180_draw_point(x,y,RGB565_RED);
+    // 不画在底线或以下; 3×3 像素红点
+    if(x>=0&&x<158&&y>=0&&y<126 && y < RADAR_CY){
+        tft180_draw_point((uint16)x,   (uint16)y,   RGB565_RED);
+        tft180_draw_point((uint16)(x+1),(uint16)y,   RGB565_RED);
+        tft180_draw_point((uint16)(x+2),(uint16)y,   RGB565_RED);
+        tft180_draw_point((uint16)x,   (uint16)(y+1),RGB565_RED);
+        tft180_draw_point((uint16)(x+1),(uint16)(y+1),RGB565_RED);
+        tft180_draw_point((uint16)(x+2),(uint16)(y+1),RGB565_RED);
+        tft180_draw_point((uint16)x,   (uint16)(y+2),RGB565_RED);
+        tft180_draw_point((uint16)(x+1),(uint16)(y+2),RGB565_RED);
+        tft180_draw_point((uint16)(x+2),(uint16)(y+2),RGB565_RED);
+    }
 }

@@ -14,6 +14,8 @@
 void    servo_init(void);
 void    servo_set_angle(uint8_t deg);
 void    servo_sweep(void);
-uint8_t servo_get_angle(void);          // 读取当前角度
+uint8_t servo_get_angle(void);
+void    servo_enable(void);
+void    servo_disable(void);
 
 #endif
