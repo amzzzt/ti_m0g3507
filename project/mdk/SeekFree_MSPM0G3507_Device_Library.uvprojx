@@ -432,6 +432,16 @@
               <FileType>5</FileType>
               <FilePath>..\user\inc\menu.h</FilePath>
             </File>
+            <File>
+              <FileName>bsp_sr04.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\bsp_sr04.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_sr04.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\bsp_sr04.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

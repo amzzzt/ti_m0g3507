@@ -12,6 +12,8 @@
 #include <stdint.h>
 
 void     tick_init(void);
-uint32_t tick_get(void);        // 返回 ms 计数器
+uint32_t tick_get(void);
+
+extern volatile uint8_t sr04_send_flag;   // ISR 置位, 主循环发无线
 
 #endif
