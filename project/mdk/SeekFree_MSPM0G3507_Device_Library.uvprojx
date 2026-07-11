@@ -418,6 +418,11 @@
               <FilePath>..\user\src\encoder.c</FilePath>
             </File>
             <File>
+              <FileName>track.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\track.c</FilePath>
+            </File>
+            <File>
               <FileName>isr.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\isr.h</FilePath>
@@ -441,6 +446,11 @@
               <FileName>encoder.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\encoder.h</FilePath>
+            </File>
+            <File>
+              <FileName>track.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\track.h</FilePath>
             </File>
             <File>
               <FileName>menu.c</FileName>
