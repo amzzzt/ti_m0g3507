@@ -24,7 +24,7 @@
 #define MOTOR_FREQ  10000   // 10kHz
 
 #define STBY_PIN    A29
-#define AIN1_PIN    B23
+#define AIN1_PIN    A13
 #define AIN2_PIN    B27
 #define BIN1_PIN    A0
 #define BIN2_PIN    A1
@@ -47,10 +47,10 @@ void motor_init(void)
 
 void motor_left(int16_t speed)
 {
-    if (speed > 1000) speed = 1000;
-    if (speed < -1000) speed = -1000;
+    if (speed > 8000) speed = 8000;
+    if (speed < -8000) speed = -8000;
 
-    uint32_t duty = (uint32_t)(speed >= 0 ? speed : -speed) * 10;
+    uint32_t duty = (uint32_t)(speed >= 0 ? speed : -speed);
 
     if (speed > 0) {
         gpio_high(AIN1_PIN);
@@ -68,10 +68,10 @@ void motor_left(int16_t speed)
 
 void motor_right(int16_t speed)
 {
-    if (speed > 1000) speed = 1000;
-    if (speed < -1000) speed = -1000;
+    if (speed > 8000) speed = 8000;
+    if (speed < -8000) speed = -8000;
 
-    uint32_t duty = (uint32_t)(speed >= 0 ? speed : -speed) * 10;
+    uint32_t duty = (uint32_t)(speed >= 0 ? speed : -speed);
 
     if (speed > 0) {
         gpio_high(BIN1_PIN);

@@ -413,6 +413,11 @@
               <FilePath>..\user\src\motor.c</FilePath>
             </File>
             <File>
+              <FileName>encoder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\encoder.c</FilePath>
+            </File>
+            <File>
               <FileName>isr.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\isr.h</FilePath>
@@ -431,6 +436,11 @@
               <FileName>motor.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\motor.h</FilePath>
+            </File>
+            <File>
+              <FileName>encoder.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\encoder.h</FilePath>
             </File>
             <File>
               <FileName>menu.c</FileName>
