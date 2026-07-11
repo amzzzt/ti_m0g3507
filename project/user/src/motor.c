@@ -26,25 +26,30 @@
 #define STBY_PIN    A29
 #define AIN1_PIN    B23
 #define AIN2_PIN    B27
+#define BIN1_PIN    A0
+#define BIN2_PIN    A1
 
 void motor_init(void)
 {
-    // GPIO 初始化: STBY 高使能, AIN1/AIN2 低
+    // STBY 高使能
     gpio_init(STBY_PIN, GPO, 1, GPO_PUSH_PULL);
+    // 左电机方向: AIN1, AIN2
     gpio_init(AIN1_PIN, GPO, 0, GPO_PUSH_PULL);
     gpio_init(AIN2_PIN, GPO, 0, GPO_PUSH_PULL);
+    // 右电机方向: BIN1, BIN2
+    gpio_init(BIN1_PIN, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(BIN2_PIN, GPO, 0, GPO_PUSH_PULL);
 
     // TIMG7 PWM: CH0→A26左, CH1→A27右
     pwm_init(PWM_TIM_G7_CH0_A26, MOTOR_FREQ, 0);
     pwm_init(PWM_TIM_G7_CH1_A27, MOTOR_FREQ, 0);
 }
 
-void motor_set(int16_t speed)
+void motor_left(int16_t speed)
 {
     if (speed > 1000) speed = 1000;
     if (speed < -1000) speed = -1000;
 
-    // 0~1000 映射到 PWM 0~10000 (PWM_DUTY_MAX)
     uint32_t duty = (uint32_t)(speed >= 0 ? speed : -speed) * 10;
 
     if (speed > 0) {
@@ -58,14 +63,34 @@ void motor_set(int16_t speed)
         gpio_low(AIN2_PIN);
         duty = 0;
     }
-
     pwm_set_duty(PWM_TIM_G7_CH0_A26, duty);
+}
+
+void motor_right(int16_t speed)
+{
+    if (speed > 1000) speed = 1000;
+    if (speed < -1000) speed = -1000;
+
+    uint32_t duty = (uint32_t)(speed >= 0 ? speed : -speed) * 10;
+
+    if (speed > 0) {
+        gpio_high(BIN1_PIN);
+        gpio_low(BIN2_PIN);
+    } else if (speed < 0) {
+        gpio_low(BIN1_PIN);
+        gpio_high(BIN2_PIN);
+    } else {
+        gpio_low(BIN1_PIN);
+        gpio_low(BIN2_PIN);
+        duty = 0;
+    }
+    pwm_set_duty(PWM_TIM_G7_CH1_A27, duty);
 }
 
 void motor_stop(void)
 {
-    gpio_low(AIN1_PIN);
-    gpio_low(AIN2_PIN);
+    gpio_low(AIN1_PIN); gpio_low(AIN2_PIN);
+    gpio_low(BIN1_PIN); gpio_low(BIN2_PIN);
     pwm_set_duty(PWM_TIM_G7_CH0_A26, 0);
     pwm_set_duty(PWM_TIM_G7_CH1_A27, 0);
 }

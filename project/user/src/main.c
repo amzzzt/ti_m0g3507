@@ -23,20 +23,21 @@ int main (void)
 
     while (true)
     {
-        // ---- 左电机缓慢加速→减速测试 ----
+        // ---- 双电机缓慢加速→减速测试 ----
         static int16_t speed = 0;
-        static int8_t  dir   = 1;       // 1=加速, -1=减速
+        static int8_t  dir   = 1;
         static uint32_t next  = 0;
         uint32_t now = tick_get();
 
-        if (now - next >= 50) {         // 每50ms 加减10
+        if (now - next >= 50) {
             next = now;
             speed += dir * 10;
 
-            if (speed >= 500)  dir = -1;  // 到500(50%)→减速
-            if (speed <= 0)    dir =  1;  // 到0   →加速
+            if (speed >= 500)  dir = -1;
+            if (speed <= 0)    dir =  1;
 
-            motor_set(speed);
+            motor_left(speed);
+            motor_right(speed);
         }
     }
 }
