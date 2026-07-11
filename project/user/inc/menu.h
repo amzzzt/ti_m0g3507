@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-#define LED1_PIN  B21
+#define LED1_PIN  B25
 
 void    menu_init(void);
 void    menu_run(void);

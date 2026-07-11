@@ -408,6 +408,11 @@
               <FilePath>..\user\src\servo.c</FilePath>
             </File>
             <File>
+              <FileName>motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\src\motor.c</FilePath>
+            </File>
+            <File>
               <FileName>isr.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\isr.h</FilePath>
@@ -421,6 +426,11 @@
               <FileName>servo.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\user\inc\servo.h</FilePath>
+            </File>
+            <File>
+              <FileName>motor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\user\inc\motor.h</FilePath>
             </File>
             <File>
               <FileName>menu.c</FileName>
