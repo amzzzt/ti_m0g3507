@@ -50,27 +50,9 @@ int track_bit(uint8_t idx)
     return (filtered >> (4 - idx)) & 1;
 }
 
-// 检查 5bit 模式是否合理 (一条线不可能中间有断点)
-static int valid_pattern(void)
-{
-    uint8_t v = filtered;
-    if (v == 0) return 1;
-    int first = -1, last = -1;
-    for (int i = 0; i < 5; i++) {
-        if (v & (1 << (4 - i))) {
-            if (first < 0) first = i;
-            last = i;
-        }
-    }
-    for (int i = first; i <= last; i++)
-        if (!(v & (1 << (4 - i)))) return 0;
-    return 1;
-}
-
 // 加权位置: -200~+200
 static int track_raw_position(void)
 {
-    if (!valid_pattern()) return 0;
     int sum_w = 0, sum_n = 0;
     int w[5] = {-2, -1, 0, 1, 2};
     for (int i = 0; i < 5; i++) {
@@ -81,7 +63,7 @@ static int track_raw_position(void)
 }
 
 static float dev_f = 0;
-#define DEV_ALPHA  0.15f
+#define DEV_ALPHA  0.1f
 
 int track_deviation(void)
 {
