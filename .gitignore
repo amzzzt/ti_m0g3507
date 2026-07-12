@@ -12,3 +12,5 @@ project/mdk/*.uvguix.*
 *.map
 *.uvguix*
 .ccsproject\n.cproject\n.project\n.settings/\ntargetConfigs/\ndelay.c\ndelay.h\nempty.c\nempty.syscfg\nREADME.md
+*.uvprojx
+*.uvoptx
