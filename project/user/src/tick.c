@@ -8,6 +8,7 @@
 #include "track.h"
 
 static volatile uint32_t g_tick_ms;
+static volatile uint8_t  g_ctrl_flag = 0;   // 10ms 控制标志
 
 static void tick_callback(uint32 event, void *ptr)
 {
@@ -16,10 +17,13 @@ static void tick_callback(uint32 event, void *ptr)
     key_scanner();
     servo_sweep();
 
-    // 每 2ms 采样灰度
-    static uint8_t div = 0;
-    if (++div >= 2) { div = 0; track_sample(); }
+    static uint8_t d2 = 0, d10 = 0;
+    if (++d2 >= 2)  { d2 = 0; track_sample(); }
+    if (++d10 >= 10) { d10 = 0; g_ctrl_flag = 1; }
 }
+
+uint8_t tick_ctrl_ready(void) { return g_ctrl_flag; }
+void    tick_ctrl_clear(void) { g_ctrl_flag = 0; }
 
 void tick_init(void) { g_tick_ms = 0; pit_ms_init(PIT_TIM_A0, 1, tick_callback, NULL); }
 uint32_t tick_get(void) { return g_tick_ms; }
