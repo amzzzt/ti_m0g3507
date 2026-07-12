@@ -34,7 +34,7 @@ int32_t encoder_right_get(void) { return r_cnt; }
 void    encoder_clear(void)     { l_cnt = r_cnt = 0; }
 
 // ---- 速度: 固定 10ms 窗口 + 4 帧滑动平均 ----
-#define MA_LEN  8
+#define MA_LEN  16
 
 typedef struct {
     int32_t last_cnt;
@@ -64,9 +64,15 @@ static void _update(spd_t *s, int32_t cur, int sign)
     if (!s->full && s->idx == 0) s->full = 1;
 
     if (s->full) {
-        int32_t sum = 0;
-        for (int i = 0; i < MA_LEN; i++) sum += s->buf[i];
-        s->val = (float)sum / (float)MA_LEN * 100.0f;
+        // 去最大最小后平均
+        int32_t min = s->buf[0], max = s->buf[0], sum = 0;
+        for (int i = 0; i < MA_LEN; i++) {
+            int32_t v = s->buf[i];
+            sum += v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+        s->val = (float)(sum - min - max) / (float)(MA_LEN - 2) * 100.0f;
     } else {
         s->val = (float)d * 100.0f;
     }
