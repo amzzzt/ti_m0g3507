@@ -8,7 +8,7 @@
 #include "pid.h"
 #include "control.h"
 
-#define KFF  6.0f
+#define KFF  7.0f
 #define PID_MAX  3000
 
 static pid_t   pl, pr;
@@ -21,8 +21,8 @@ void control_init(void)
     encoder_clear();
     encoder_filter_reset();
 
-    pid_init(&pl, 0.5f, 0.02f, 1.0f, PID_MAX);
-    pid_init(&pr, 0.5f, 0.02f, 1.0f, PID_MAX);
+    pid_init(&pl, 3.0f, 0.1f, 2.0f, PID_MAX);
+    pid_init(&pr, 3.0f, 0.1f, 2.0f, PID_MAX);
 }
 
 void control_set_target(int16_t l, int16_t r) { tl = l; tr = r; }
@@ -31,27 +31,30 @@ int16_t control_target_right(void) { return tr; }
 
 void control_update(void)
 {
-    // 1. 编码器 10ms 更新
     encoder_update();
 
-    // 2. 读速度
+    // 目标=0 → 直接停
+    if (tl == 0 && tr == 0) {
+        motor_stop();
+        pl.integral = 0; pl.prev_err = 0;
+        pr.integral = 0; pr.prev_err = 0;
+        return;
+    }
+
     float sl = encoder_left_speed();
     float sr = encoder_right_speed();
 
-    // 3. 前馈
     int16_t bl = (int16_t)((float)tl * KFF);
     int16_t br = (int16_t)((float)tr * KFF);
 
-    // 4. PID
     float ol = pid_compute(&pl, (float)tl, sl);
     float or = pid_compute(&pr, (float)tr, sr);
 
-    // 5. 输出
-    int16_t pl = bl + (int16_t)ol;
-    int16_t pr = br + (int16_t)or;
-    if (pl > 8000) pl = 8000; if (pl < -8000) pl = -8000;
-    if (pr > 8000) pr = 8000; if (pr < -8000) pr = -8000;
+    int16_t pl_w = bl + (int16_t)ol;
+    int16_t pr_w = br + (int16_t)or;
+    if (pl_w > 8000) pl_w = 8000; if (pl_w < -8000) pl_w = -8000;
+    if (pr_w > 8000) pr_w = 8000; if (pr_w < -8000) pr_w = -8000;
 
-    motor_left(pl);
-    motor_right(pr);
+    motor_left(pl_w);
+    motor_right(pr_w);
 }

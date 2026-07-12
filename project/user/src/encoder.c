@@ -34,7 +34,7 @@ int32_t encoder_right_get(void) { return r_cnt; }
 void    encoder_clear(void)     { l_cnt = r_cnt = 0; }
 
 // ---- 速度: 固定 10ms 窗口 + 4 帧滑动平均 ----
-#define MA_LEN  4
+#define MA_LEN  8
 
 typedef struct {
     int32_t last_cnt;
@@ -55,6 +55,9 @@ static void _update(spd_t *s, int32_t cur, int sign)
 {
     int32_t d = (cur - s->last_cnt) * sign;
     s->last_cnt = cur;
+
+    // 异常值过滤: 10ms 内不可能 >100 脉冲
+    if (d > 100 || d < -100) return;
 
     s->buf[s->idx] = d;
     s->idx = (s->idx + 1) % MA_LEN;
