@@ -59,6 +59,12 @@ static void _update(spd_t *s, int32_t cur, int sign)
     if (d > 100 || d < -100) return;
 
     float raw = (float)d * 100.0f;            // → pps
+
+    // 变化率限制: 每次最多跳 ±30 pps, 钳住偶发大毛刺
+    float diff = raw - s->val;
+    if (diff >  30.0f) raw = s->val + 30.0f;
+    if (diff < -30.0f) raw = s->val - 30.0f;
+
     s->val = ALPHA * raw + (1.0f - ALPHA) * s->val;
 }
 
