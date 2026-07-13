@@ -27,7 +27,7 @@ int main(void)
 
         static uint32_t pt = 0;
         uint32_t now = tick_get();
-        if (now - pt >= 200) {
+        if (now - pt >= 100) {
             pt = now;
             int d = track_deviation();
             int sl = (int)encoder_left_speed();

@@ -1,7 +1,8 @@
 /**
- * encoder.c — AB 相编码器 + 固定窗口 + 滑动平均
+ * encoder.c — AB 相编码器: EXTI 计数 + 低通滤波
  *
- *   EXTI 计数 → 每 10ms 算速度 → 4 次滑动平均 → 输出
+ *   左: A=B3  B=B16    右: A=B15  B=B13
+ *   A 相上升沿中断, 读 B 相判方向
  */
 #include "zf_driver_exti.h"
 #include "zf_driver_gpio.h"
@@ -33,52 +34,35 @@ int32_t encoder_left_get(void)  { return l_cnt; }
 int32_t encoder_right_get(void) { return r_cnt; }
 void    encoder_clear(void)     { l_cnt = r_cnt = 0; }
 
-// ---- 速度: 固定 10ms 窗口 + 4 帧滑动平均 ----
-#define MA_LEN  16
+// ---- 速度: 低通滤波 ----
+#define ALPHA  0.15f
 
 typedef struct {
     int32_t last_cnt;
-    int32_t buf[MA_LEN];
-    uint8_t idx, full;
     float   val;
 } spd_t;
 static spd_t sl, sr;
 
 void encoder_filter_reset(void)
 {
-    sl.last_cnt = l_cnt; sl.idx = 0; sl.full = 0; sl.val = 0;
-    sr.last_cnt = r_cnt; sr.idx = 0; sr.full = 0; sr.val = 0;
+    sl.last_cnt = l_cnt; sl.val = 0;
+    sr.last_cnt = r_cnt; sr.val = 0;
 }
 
-// 每 10ms 调一次 (TIMA0 ISR)
+// 每 10ms 调一次
 static void _update(spd_t *s, int32_t cur, int sign)
 {
     int32_t d = (cur - s->last_cnt) * sign;
     s->last_cnt = cur;
 
-    // 异常值过滤: 10ms 内不可能 >100 脉冲
+    // 异常值: 10ms 内不可能 >100 脉冲
     if (d > 100 || d < -100) return;
 
-    s->buf[s->idx] = d;
-    s->idx = (s->idx + 1) % MA_LEN;
-    if (!s->full && s->idx == 0) s->full = 1;
-
-    if (s->full) {
-        // 去最大最小后平均
-        int32_t min = s->buf[0], max = s->buf[0], sum = 0;
-        for (int i = 0; i < MA_LEN; i++) {
-            int32_t v = s->buf[i];
-            sum += v;
-            if (v < min) min = v;
-            if (v > max) max = v;
-        }
-        s->val = (float)(sum - min - max) / (float)(MA_LEN - 2) * 100.0f;
-    } else {
-        s->val = (float)d * 100.0f;
-    }
+    float raw = (float)d * 100.0f;            // → pps
+    s->val = ALPHA * raw + (1.0f - ALPHA) * s->val;
 }
 
-void encoder_update(void)   // 每 10ms 调用
+void encoder_update(void)
 {
     _update(&sl, l_cnt, -1);
     _update(&sr, r_cnt,  1);

@@ -7,10 +7,8 @@
 #include "track.h"
 #include "control.h"
 
-#define KFF     7.0f
 #define PID_MAX 3000
 #define KP      2.0f
-#define DEAD    10
 #define STEER_MAX  400
 #define BASE_DEF   250
 
@@ -36,9 +34,8 @@ void control_update(void)
     // 1. 读偏差
     int dev = track_deviation();
 
-    // 2. P转向 + 死区 + 限幅
+    // 2. P转向 + 限幅
     int steer = (int)(KP * (float)dev);
-    if (steer > -DEAD && steer < DEAD)   steer = 0;
     if (steer >  STEER_MAX) steer =  STEER_MAX;
     if (steer < -STEER_MAX) steer = -STEER_MAX;
 
@@ -50,13 +47,8 @@ void control_update(void)
     float sl = encoder_left_speed();
     float sr = encoder_right_speed();
 
-    int16_t bl = (int16_t)((float)tgt_l * KFF);
-    int16_t br = (int16_t)((float)tgt_r * KFF);
-    int16_t ol = (int16_t)pid_compute(&pl, (float)tgt_l, sl);
-    int16_t or = (int16_t)pid_compute(&pr, (float)tgt_r, sr);
-
-    int16_t pwm_l = bl + ol;
-    int16_t pwm_r = br + or;
+    int16_t pwm_l = (int16_t)pid_compute(&pl, (float)tgt_l, sl);
+    int16_t pwm_r = (int16_t)pid_compute(&pr, (float)tgt_r, sr);
     if (pwm_l >  8000) pwm_l =  8000; if (pwm_l < -8000) pwm_l = -8000;
     if (pwm_r >  8000) pwm_r =  8000; if (pwm_r < -8000) pwm_r = -8000;
 
