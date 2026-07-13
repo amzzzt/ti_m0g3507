@@ -7,7 +7,7 @@
 #include "track.h"
 #include "control.h"
 
-#define PID_MAX 3000
+#define PID_MAX 8000
 #define KP      5.0f
 #define STEER_MAX  800
 #define BASE_DEF   250

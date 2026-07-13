@@ -35,26 +35,28 @@ int track_deviation(void)
 
     int raw;
     if (sum_n > 0) {
-        raw = sum_w * 100 / sum_n;
+        raw = sum_w * 120 / sum_n;
         last_raw = raw;
         lost_cnt = 0;
     } else {
-        // 全白丢线: 渐增强力回调, 直到满偏 ±200
+        // 全白丢线: 渐增强力回调
         if (lost_cnt < 20) lost_cnt++;
         int sign = (last_raw >= 0) ? 1 : -1;
         int mag  = (last_raw >= 0) ? last_raw : -last_raw;
         int boost = sign * (mag + lost_cnt * 15);
-        if (boost >  200) boost =  200;
-        if (boost < -200) boost = -200;
+        if (boost >  240) boost =  240;
+        if (boost < -240) boost = -240;
         raw = boost;
     }
 
-    // 变化率限制: 单次野值跳变直接钳住
+    // 变化率限制
     int cur = (int)dev_f;
     if (raw - cur >  DEV_DELTA) raw = cur + DEV_DELTA;
     if (raw - cur < -DEV_DELTA) raw = cur - DEV_DELTA;
 
-    // 低通
-    dev_f = ALPHA * (float)raw + (1.0f - ALPHA) * dev_f;
+    // 低通: 回到中间时快速收敛, 防止过度回调
+    int mag = (raw >= 0) ? raw : -raw;
+    float alpha = (mag < 50 && cur > 50) || (mag < 50 && cur < -50) ? 0.6f : ALPHA;
+    dev_f = alpha * (float)raw + (1.0f - alpha) * dev_f;
     return (int)dev_f;
 }

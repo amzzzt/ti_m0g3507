@@ -16,7 +16,7 @@ int main(void)
     wireless_uart_init();
 
     control_init();
-    control_set_speed(250);
+    control_set_speed(375);
 
     while (1)
     {
