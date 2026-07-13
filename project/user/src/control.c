@@ -8,8 +8,8 @@
 #include "control.h"
 
 #define PID_MAX 3000
-#define KP      2.0f
-#define STEER_MAX  400
+#define KP      5.0f
+#define STEER_MAX  800
 #define BASE_DEF   250
 
 static pid_t   pl, pr;
