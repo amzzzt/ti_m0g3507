@@ -1,31 +1,32 @@
 /**
- * main.c — IMU660RC 测试
- *   SPI0: SCK=B18 MOSI=B17 MISO=B19 CS=A2 INT2=B24
- *   无线 UART1: B5/B6/B2
+ * main.c — stepper motor 1, 533Hz target
  */
 #include "zf_common_headfile.h"
-#include "tick.h"
-#include "zf_device_imu660rc.h"
+#include "zf_driver_pwm.h"
+#include "stepper.h"
 
 int main(void) {
     clock_init(SYSTEM_CLOCK_80M);
     wireless_uart_init();
-    imu660rc_init(IMU660RC_QUARTERNION_60HZ);
 
-    while (1) {
-        char buf[50];
-        system_delay_ms(20);
-        float r = imu660rc_roll, p = imu660rc_pitch, y = imu660rc_yaw;
-        if(r != r || r > 1e4f || r < -1e4f) r = 0;
-        if(p != p || p > 1e4f || p < -1e4f) p = 0;
-        if(y != y || y > 1e4f || y < -1e4f) y = 0;
-        int ir = (int)(r);
-        int ip = (int)(p);
-        int iy = (int)(y);
-        if(ir > 1000 || ir < -1000) ir = 0;
-        if(ip > 1000 || ip < -1000) ip = 0;
-        if(iy > 1000 || iy < -1000) iy = 0;
-        sprintf(buf, "%d,%d,%d\r\n", ir, ip, iy);
-        wireless_uart_send_string(buf);
-    }
+    char buf[50];
+    sprintf(buf, "%d\r\n", 123);
+    wireless_uart_send_string(buf);
+
+    // 电机1 暂不启动
+    // stepper_init(STEP1);
+    // stepper_enable(STEP1);
+    // stepper_set_dir(STEP1, 1);
+
+    stepper_init(STEP2);
+    stepper_enable(STEP2);
+    stepper_set_dir(STEP2, 1);
+
+    sprintf(buf, "%d\r\n", 456);
+    wireless_uart_send_string(buf);
+
+    // 电机2 持续旋转 ~533Hz
+    pwm_init(PWM_TIM_A1_CH0_A15, 1066, 5000);
+
+    while (1);
 }

@@ -4,7 +4,7 @@
 #include "zf_driver_pit.h"
 #include "tick.h"
 #include "zf_device_key.h"
-#include "servo.h"
+//#include "servo.h"
 
 static volatile uint32_t g_tick_ms;
 static volatile uint8_t  g_ctrl_flag = 0;   // 10ms 控制标志
@@ -14,7 +14,7 @@ static void tick_callback(uint32 event, void *ptr)
     (void)event; (void)ptr;
     g_tick_ms++;
     key_scanner();
-    servo_sweep();
+    //servo_sweep();
 
     static uint8_t d10 = 0;
     if (++d10 >= 10) { d10 = 0; g_ctrl_flag = 1; }

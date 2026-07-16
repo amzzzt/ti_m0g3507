@@ -1,109 +1,76 @@
 /**
- * stepper.c — 步进电机驱动实现
+ * stepper.c — 双步进电机驱动 (TIMA1 PWM)
  *
- *   RST=高 SLP=高 DCY=高 → 大扭矩工作模式
- *   PWM 每发一个脉冲 → 一个微步 (0.05625°)
- *   6400 脉冲 = 一圈 (360°)
+ *   引脚说明:
+ *     RST: 高=工作, 低=停
+ *     SLP: 高=锁定(手拧不动), 低=休眠(手可拧)
+ *     DCY: 高=大扭矩, 低=小扭矩
+ *     DIR: 高=正转, 低=反转
+ *     PWM: 1脉冲=1微步=0.05625°, 6400脉冲/圈
+ *
+ *   电机1: A16(TIMA1 CH1)   电机2: A15(TIMA1 CH0)
  */
 #include "zf_driver_gpio.h"
 #include "zf_driver_pwm.h"
 #include "zf_driver_delay.h"
 #include "stepper.h"
 
-static uint16_t g_pulse_hz = 1000;    // 默认脉冲频率 1kHz
+#define STEP1_PWM  PWM_TIM_A1_CH1_A16   // TIMA1 CH1
+#define STEP2_PWM  PWM_TIM_A1_CH0_A15   // TIMA1 CH0
 
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     初始化步进电机引脚
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_init(void)
-{
-    // 控制引脚
-    gpio_init(STEPPER_RST_PIN, GPO, 1, GPO_PUSH_PULL);  // 上电默认使能
-    gpio_init(STEPPER_SLP_PIN, GPO, 1, GPO_PUSH_PULL);  // 上电默认唤醒
-    gpio_init(STEPPER_DCY_PIN, GPO, 1, GPO_PUSH_PULL);  // 大扭矩模式
-    gpio_init(STEPPER_DIR_PIN, GPO, 0, GPO_PUSH_PULL);  // 初始方向正转
+typedef struct {
+    gpio_pin_enum    rst, slp, dcy, dir;
+    pwm_channel_enum pwm;
+    uint16_t         hz;
+} stepper_t;
 
-    // PWM 脉冲: 用 GPIO 模拟, 后续如需硬件 PWM 可改为 pwm_init
-    gpio_init(STEPPER_PWM_PIN, GPO, 0, GPO_PUSH_PULL);
-}
+static stepper_t g_step[2];
 
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     使能步进电机 (大扭矩工作模式)
-//              RST=1  SLP=1  DCY=1
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_enable(void)
-{
-    gpio_high(STEPPER_RST_PIN);
-    gpio_high(STEPPER_SLP_PIN);
-    gpio_high(STEPPER_DCY_PIN);
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     禁用步进电机 (可手拧)
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_disable(void)
-{
-    gpio_low(STEPPER_RST_PIN);
-    gpio_low(STEPPER_SLP_PIN);
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     设置方向
-// 参数说明     forward  1=正转  0=反转
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_set_dir(uint8_t forward)
-{
-    if (forward)
-        gpio_high(STEPPER_DIR_PIN);
-    else
-        gpio_low(STEPPER_DIR_PIN);
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     发送一个脉冲 → 电机走一个微步 (0.05625°)
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_pulse(void)
-{
-    gpio_high(STEPPER_PWM_PIN);
-    system_delay_us(1);                 // 脉宽 >1us 即可
-    gpio_low(STEPPER_PWM_PIN);
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     设置脉冲频率
-// 参数说明     hz   脉冲频率 (Hz), 决定转速
-//              rpm = hz * 60 / 6400
-//              例: 6400Hz → 60rpm
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_set_speed(uint16_t hz)
-{
-    if (hz > 0) g_pulse_hz = hz;
-}
-
-//-------------------------------------------------------------------------------------------------------------------
-// 函数简介     旋转指定角度, 阻塞执行
-// 参数说明     deg   目标角度 (°), 正=正转 负=反转
-// 使用示例     stepper_rotate_deg(90.0f);   // 正转 90°
-//              stepper_rotate_deg(-45.0f);  // 反转 45°
-//-------------------------------------------------------------------------------------------------------------------
-void stepper_rotate_deg(float deg)
-{
-    if (deg > 0)
-        stepper_set_dir(1);
-    else {
-        stepper_set_dir(0);
-        deg = -deg;
+void stepper_init(stepper_id_t id) {
+    stepper_t *s = &g_step[id];
+    if (id == STEP1) {
+        s->rst = STEP1_RST_PIN; s->slp = STEP1_SLP_PIN;
+        s->dcy = STEP1_DCY_PIN; s->dir = STEP1_DIR_PIN;
+        s->pwm = STEP1_PWM;
+    } else {
+        s->rst = STEP2_RST_PIN; s->slp = STEP2_SLP_PIN;
+        s->dcy = STEP2_DCY_PIN; s->dir = STEP2_DIR_PIN;
+        s->pwm = STEP2_PWM;
     }
+    s->hz = 1000;
+    gpio_init(s->rst, GPO, 1, GPO_PUSH_PULL);
+    gpio_init(s->slp, GPO, 1, GPO_PUSH_PULL);
+    gpio_init(s->dcy, GPO, 1, GPO_PUSH_PULL);
+    gpio_init(s->dir, GPO, 0, GPO_PUSH_PULL);
+}
 
-    uint32_t steps = (uint32_t)(deg / STEPPER_STEP_ANGLE);
-    uint32_t delay_us = 1000000UL / g_pulse_hz;  // 脉冲间隔 (us)
-    // 扣除脉宽, 保证实际频率准确
-    uint32_t half = (delay_us > 2) ? (delay_us / 2) : 1;
+void stepper_enable(stepper_id_t id) {
+    stepper_t *s = &g_step[id];
+    gpio_high(s->rst); gpio_high(s->slp); gpio_high(s->dcy);
+}
 
-    for (uint32_t i = 0; i < steps; i++) {
-        gpio_high(STEPPER_PWM_PIN);
-        system_delay_us(half);
-        gpio_low(STEPPER_PWM_PIN);
-        system_delay_us(half);
-    }
+void stepper_disable(stepper_id_t id) {
+    stepper_t *s = &g_step[id];
+    gpio_low(s->rst); gpio_low(s->slp);
+}
+
+void stepper_set_dir(stepper_id_t id, uint8_t forward) {
+    stepper_t *s = &g_step[id];
+    forward ? gpio_high(s->dir) : gpio_low(s->dir);
+}
+
+void stepper_set_speed(stepper_id_t id, uint16_t hz) {
+    if (hz < 1) hz = 1;
+    g_step[id].hz = hz;
+}
+
+void stepper_rotate_deg(stepper_id_t id, float deg) {
+    stepper_t *s = &g_step[id];
+    uint32_t steps = (uint32_t)(deg / STEPPER_STEP_ANGLE + 0.5f);
+    if (steps == 0) return;
+    uint32_t dur_ms = (uint32_t)((float)steps * 1000.0f / (float)s->hz);
+    if (dur_ms < 1) dur_ms = 1;
+    pwm_init(s->pwm, s->hz, 5000);   // 50% duty (PWM_DUTY_MAX=10000)
+    system_delay_ms(dur_ms);
+    pwm_set_duty(s->pwm, 0);
 }

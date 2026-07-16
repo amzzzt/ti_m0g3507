@@ -5,7 +5,7 @@
 #include "menu.h"
 #include "zf_common_headfile.h"
 #include "tick.h"
-#include "bsp_sr04.h"
+//#include "bsp_sr04.h" // 暂禁用超声波, 腾出 A8/A9
 #include "radar.h"
 #include "servo.h"
 #include <stdio.h>
@@ -57,7 +57,7 @@ void menu_run(void)
     {
         static uint32_t led_tick = 0;
         static uint8_t  led_on   = 0;
-        float d = sr04_read();
+        float d = 99.0f; // sr04_read()
         if (d > 0.0f && d < 20.0f) {
             if (now - led_tick >= 50) {   // 50ms半周期
                 led_tick = now;
@@ -154,7 +154,7 @@ void menu_run(void)
             radar_draw_dots();
 
             // 逐飞助手: 通道0=角度, 通道1=滤波距离
-            float dist = sr04_read();
+            float dist = 99.0f; // sr04_read()
             char buf[32];
             int d = (int)(dist * 10.0f + 0.5f);
             sprintf(buf, "%d,%d.%d\r\n", (int)cur_ang, d / 10, d % 10);
@@ -178,9 +178,9 @@ void menu_run(void)
         // 测量
         if (now - next_trig >= 60) {
             next_trig = now + 60;
-            sr04_trigger();
+            // sr04_trigger();
 
-            float dist = sr04_read();
+            float dist = 99.0f; // sr04_read()
             uint8_t ang = servo_get_angle();
             if (dist >= 2.0f && dist <= 50.0f) {
                 radar_add_dot(ang, dist);
