@@ -44,7 +44,7 @@
 #define DEBUG_UART_RX_PIN           ( UART0_RX_A11 )                            // 指定 debug uart 所使用的的串口引脚
 
 
-#define DEBUG_UART_USE_INTERRUPT    ( 1 )                                       // 是否启用 debug uart 接收中断
+#define DEBUG_UART_USE_INTERRUPT    ( 0 )                                       // 是否启用 debug uart 接收中断
 
 #if DEBUG_UART_USE_INTERRUPT                                                    // 条件编译 只有在启用串口中断才编译
 		#define DEBUG_UART_PRIORITY         (UART0_INT_IRQn)                    // 对应串口中断的中断编号 mspm0g350x  IRQn_Type 枚举体

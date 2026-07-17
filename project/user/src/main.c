@@ -1,5 +1,5 @@
 /**
- * main.c — 泰山派偏差接收
+ * main.c — 泰山派偏差接收 (ISR驱动)
  */
 #include "zf_common_headfile.h"
 #include "tick.h"
@@ -11,13 +11,11 @@ int main(void) {
     tick_init();
     protocol_init(115200);
 
-    char buf[64];
+	char buf[64];
     sprintf(buf, "OK\r\n");
     wireless_uart_send_string(buf);
 
     while (1) {
-        protocol_poll();
-
         offset_t off = protocol_get();
         if (off.updated) {
             sprintf(buf, "%d %d\r\n", off.dx, off.dy);
