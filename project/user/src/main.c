@@ -1,26 +1,28 @@
 /**
- * main.c — Y轴滤波波形
+ * main.c — 双电机时钟补偿测试
+ *   M1(TIMA1): 2000→实际~1000Hz   M2(TIMG6): 1000→实际~1000Hz
  */
 #include "zf_common_headfile.h"
 #include "tick.h"
-#include "protocol.h"
-#include "filter.h"
+#include "stepper.h"
 
 int main(void) {
     clock_init(SYSTEM_CLOCK_80M);
-    wireless_uart_init();
     tick_init();
-    protocol_init(115200);
-    filter_init();
-
-    char buf[64];
+    stepper_init(STEP1);
+    stepper_init(STEP2);
+    stepper_set_speed(STEP1, 2000);
+    stepper_set_speed(STEP2, 1000);
+    stepper_enable(STEP1);
+    stepper_enable(STEP2);
+    stepper_set_dir(STEP1, 1);
+    stepper_set_dir(STEP2, 1);
 
     while (1) {
-        offset_t off = protocol_get();
-        if (off.updated) {
-            filter_update(off.dx, off.dy, tick_get());
-            sprintf(buf, "%d,%d\r\n", off.dy, filter_y());
-            wireless_uart_send_string(buf);
+        stepper_rotate(STEP1, 3600.0f);
+        stepper_rotate(STEP2, 3600.0f);
+        while (stepper_is_running(STEP1) || stepper_is_running(STEP2)) {
+            stepper_tick();
         }
     }
 }
