@@ -7,7 +7,7 @@
 #include "tick.h"
 //#include "bsp_sr04.h" // 暂禁用超声波, 腾出 A8/A9
 #include "radar.h"
-#include "servo.h"
+//#include "servo.h"  // TIMG8 腾给步进电机
 #include <stdio.h>
 
 typedef enum { PAGE_NORMAL, PAGE_MENU_MAIN, PAGE_ROTATE } page_t;
@@ -124,7 +124,7 @@ void menu_run(void)
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
             key_clear_state(KEY_4);
             active = 0;
-            servo_disable();
+            /*servo_disable();*/
             radar_clear_dots();
             page = PAGE_MENU_MAIN; draw_menu();
             last_tick = now;
@@ -136,8 +136,8 @@ void menu_run(void)
                 key_clear_state(KEY_1);
                 active = 1;
                 next_trig = now; scan_tick = now;
-                servo_enable();
-                prev_deg = servo_get_angle();
+                /*servo_enable();*/
+                prev_deg = 0; // servo_get_angle()
                 radar_clear_dots();
                 radar_scanline_reset();
                 radar_draw_base();
@@ -149,7 +149,7 @@ void menu_run(void)
         // ---- 扫描线+红点+无线 每40ms ----
         if (now - scan_tick >= 40) {
             scan_tick = now;
-            uint8_t cur_ang = servo_get_angle();
+            uint8_t cur_ang = 0; // servo_get_angle()
             radar_draw_scanline(cur_ang);
             radar_draw_dots();
 
@@ -164,7 +164,7 @@ void menu_run(void)
 
         // 检测转向 → 180°扫完, 全清屏+红点
         {
-            uint8_t cur = servo_get_angle();
+            uint8_t cur = 0; // servo_get_angle()
             int diff = (int)cur - (int)prev_deg;
             // prev≥178且角度下降 → 刚过180°; prev≤2且角度上升 → 刚过0°
             if ((diff < 0 && prev_deg >= 178) || (diff > 0 && prev_deg <= 2)) {
@@ -181,7 +181,7 @@ void menu_run(void)
             // sr04_trigger();
 
             float dist = 99.0f; // sr04_read()
-            uint8_t ang = servo_get_angle();
+            uint8_t ang = 0; // servo_get_angle()
             if (dist >= 2.0f && dist <= 50.0f) {
                 radar_add_dot(ang, dist);
             }

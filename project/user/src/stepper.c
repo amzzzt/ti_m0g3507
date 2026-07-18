@@ -1,8 +1,7 @@
 /**
- * stepper.c — 双路 TMC2209 (共用 TIMA1 CH1+CH0)
- *   M1: EN=A12 DIR=B23 STEP=A16(TIMA1 CH1, AF5)
- *   M2: EN=A8  DIR=B4  STEP=A10(TIMA1 CH0, AF5)
- *   BUSCLK=40MHz, 库算用80MHz → clock_div=2
+ * stepper.c — 双路 TMC2209 (独立定时器)
+ *   M1: EN=A12 DIR=B23 STEP=A16(TIMA1 CH1, clock_div=2)
+ *   M2: EN=A8  DIR=B4  STEP=A7 (TIMG8 CH0, clock_div=1)
  */
 #include "zf_driver_gpio.h"
 #include "zf_driver_pwm.h"
@@ -13,7 +12,7 @@
 #define EN_M1      A12
 #define DIR_M1     B23
 
-#define PWM_M2     PWM_TIM_A1_CH0_A10
+#define PWM_M2     PWM_TIM_G8_CH0_A7
 #define EN_M2      A8
 #define DIR_M2     B4
 
@@ -41,7 +40,8 @@ void stepper_init(stepper_id_t id)
     }
     s->running = 0;
     s->speed = 1000;
-    s->clock_div = 2;   // BUSCLK=40MHz, 库算用80MHz, 实际=请求/2
+    /* TIMA1: 库算80M/实际40M→div=2; TIMG8: 库算40M/实际40M→div=1 */
+    s->clock_div = (id == STEP1) ? 2 : 1;
     gpio_init(s->en,  GPO, 1, GPO_PUSH_PULL);
     gpio_init(s->dir, GPO, 0, GPO_PUSH_PULL);
     /* STEP 引脚先拉低防浮空, pwm_init 会重新配 AF */
