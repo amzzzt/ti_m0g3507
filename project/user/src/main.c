@@ -1,11 +1,7 @@
 /**
- * main.c — Y轴追球 状态机控制
- *
- *   IDLE    : 等待首帧, 电机停
- *   TRACK   : 球可见, PI调速追踪
- *   SEARCH  : 球丢失, 慢转搜索, 超时回IDLE
- *
- *   防抖: 连续3帧零→进入搜索, 连续3帧有效→回到追踪
+ * main.c — 双轴追球 固定转速+PID方向决策
+ *   两轴统一160Hz, PID输出定方向/启停
+ *   丢球搜索: 来回各0.5s, 总1s后停, 不缠线
  */
 #include "zf_common_headfile.h"
 #include "zf_device_wireless_uart.h"
@@ -14,45 +10,123 @@
 #include "filter.h"
 #include "stepper.h"
 
-/* PI */
-#define KP         3.5f
-#define KI         0.25f
-#define OUT_MAX    800
-#define OUT_MIN   -800
-#define DEADBAND   10
+#define FIXED_HZ   160
+#define KP         3.0f
+#define KI         0.15f
+#define KD         0.0f
+#define OUT_MAX    500
+#define DB_STOP    4
+#define DB_START   12
 #define DT_MS      20
-
-/* 状态机 */
-#define DEBOUNCE   3       // 连续N帧才切换状态
-#define SEARCH_HZ  150     // 搜索转速
-#define SEARCH_TO  3000    // 搜索超时 ms
+#define DEBOUNCE   15
+#define SEARCH_HZ  150
+#define SEARCH_MS  500
 
 typedef enum { IDLE, TRACK, SEARCH } state_t;
 
 typedef struct {
-    float Kp, Ki;
-    float integral;
-    float prev_err;
+    float Kp, Ki, Kd, integral, prev_err;
 } pid_t;
+
+typedef struct {
+    stepper_id_t motor;
+    pid_t   pid;
+    state_t state;
+    uint8_t  cur_dir;
+    uint32_t search_t0;
+    uint8_t  search_phase;
+    uint8_t  lost_cnt, found_cnt, enabled;
+    uint16_t frm_cnt;
+    uint8_t  stopped;
+    uint8_t  running;
+} axis_t;
 
 static float pid_step(pid_t *p, float err, float dt) {
     float P = p->Kp * err;
-    float D = 0;
-    if (dt > 0.001f) D = 0;  // D=0
-    p->prev_err = err;
-
+    p->integral += err * dt;
+    if (p->integral >  80) p->integral =  80;
+    if (p->integral < -80) p->integral = -80;
     float I = p->Ki * p->integral;
-    float out_u = P + I + D;
-    if (!((out_u <= OUT_MIN && err < 0) || (out_u >= OUT_MAX && err > 0)))
-        p->integral += err * dt;
-    if (p->integral >  100) p->integral =  100;
-    if (p->integral < -100) p->integral = -100;
-    I = p->Ki * p->integral;
+    float out = P + I;
+    if (out >  OUT_MAX) out =  OUT_MAX;
+    if (out < -OUT_MAX) out = -OUT_MAX;
 
-    float out = P + I + D;
-    if (out > OUT_MAX) out = OUT_MAX;
-    if (out < OUT_MIN) out = OUT_MIN;
+    /* 输出饱和时冻结积分 */
+    if ((out >= OUT_MAX && err > 0) || (out <= -OUT_MAX && err < 0))
+        p->integral -= err * dt;
     return out;
+}
+
+static void axis_calc(axis_t *a, float fv, float err, float dt, uint32_t now,
+                      uint8_t *dir, uint8_t *run) {
+    *dir = 0; *run = 0;
+
+    /* 状态切换 */
+    switch (a->state) {
+    case IDLE:
+        if (a->enabled && a->found_cnt >= DEBOUNCE) {
+            a->state = TRACK; a->stopped = 0; a->pid.integral = 0;
+        }
+        break;
+    case TRACK:
+        if (a->lost_cnt >= DEBOUNCE) {
+            a->state = SEARCH; a->search_t0 = now; a->search_phase = 0;
+            a->pid.integral = 0; a->stopped = 0;
+        }
+        break;
+    case SEARCH:
+        if (a->found_cnt >= DEBOUNCE) {
+            a->state = TRACK; a->pid.integral = 0; a->stopped = 0;
+        } else if (a->search_phase < 2) {
+            uint32_t el = now - a->search_t0;
+            if (el >= SEARCH_MS) { a->search_phase++; a->search_t0 = now; }
+        } else {
+            a->state = IDLE;  // 搜索完毕, 停
+        }
+        break;
+    }
+
+    /* 状态执行 */
+    switch (a->state) {
+    case IDLE: break;
+    case SEARCH:
+        if (a->search_phase < 2) {
+            *dir = (a->search_phase == 0) ? 0 : 1;
+            *run = 1;
+        }
+        break;
+    case TRACK: {
+        float out = pid_step(&a->pid, err, dt);
+
+        /* 滞回: 停了要>START才重启, 跑着<STOP才停 */
+        float ae = (err > 0) ? err : -err;
+        if (a->stopped) {
+            if (ae > DB_START) a->stopped = 0;
+        } else {
+            if (ae < DB_STOP)  a->stopped = 1;
+        }
+
+        if (!a->stopped) {
+            *dir = (out > 0) ? 1 : 0;
+            *run = 1;
+        }
+        break;
+    }
+    }
+}
+
+static void motors_apply(axis_t *y, axis_t *x) {
+    if (y->running) {
+        stepper_set_dir(y->motor, y->cur_dir);
+        stepper_set_speed(y->motor, FIXED_HZ);
+        stepper_run(y->motor, FIXED_HZ);
+    } else stepper_stop(y->motor);
+
+    if (x->running) {
+        stepper_set_dir(x->motor, x->cur_dir);
+        stepper_set_speed(x->motor, FIXED_HZ);
+        stepper_run(x->motor, FIXED_HZ);
+    } else stepper_stop(x->motor);
 }
 
 int main(void) {
@@ -62,120 +136,47 @@ int main(void) {
     protocol_init(115200);
     filter_init();
     stepper_init(STEP1);
+    stepper_init(STEP2);
 
-    pid_t    pid      = {KP, KI, 0, 0};
-    state_t  state    = IDLE;
-    uint16_t cur_hz   = 0;
-    uint8_t  cur_dir  = 0;
-    uint8_t  last_dir = 0;   // 0=未知 1=右 2=左
-    uint32_t next_ms  = 0;
-    uint32_t last_ms  = 0;
-    uint32_t search_t0= 0;
-    uint8_t  lost_cnt = 0;
-    uint8_t  found_cnt= 0;
-    uint8_t  enabled  = 0;
-    uint16_t frm_cnt  = 0;
+    axis_t y_axis = {STEP1, {KP,KI,KD,0,0}, IDLE, 0, 0,0, 0,0,0,0,0,0};
+    axis_t x_axis = {STEP2, {KP,KI,KD,0,0}, IDLE, 0, 0,0, 0,0,0,0,0,0};
+
+    uint32_t next_ms = 0, last_ms = 0;
 
     while (1) {
-        /* === 收数 + 防抖计数 === */
         offset_t o = protocol_get();
         if (o.updated) {
-            if (!o.found || (o.dx == 0 && o.dy == 0)) {
-                lost_cnt++;
-                found_cnt = 0;
-            } else {
-                found_cnt++;
-                lost_cnt = 0;
+            if (!o.found) {
+                y_axis.lost_cnt++; y_axis.found_cnt = 0;
+                x_axis.lost_cnt++; x_axis.found_cnt = 0;
+            } else if (o.dx != 0 || o.dy != 0) {
+                y_axis.found_cnt++; y_axis.lost_cnt = 0;
+                x_axis.found_cnt++; x_axis.lost_cnt = 0;
                 filter_update(o.dx, o.dy, tick_get());
-                if (!enabled && ++frm_cnt > 20) {
-                    stepper_enable(STEP1); enabled = 1;
-                    pid.integral = 0; pid.prev_err = 0;
+                if (!y_axis.enabled && ++y_axis.frm_cnt > 20) {
+                    stepper_enable(STEP1); y_axis.enabled = 1;
+                    stepper_enable(STEP2); x_axis.enabled = 1;
                 }
             }
         }
 
         uint32_t now = tick_get();
-
-        /* === 控制(每 DT_MS) === */
         if ((int32_t)(now - next_ms) >= 0) {
             float dt = (float)(now - last_ms) * 0.001f;
             if (dt <= 0) dt = 0.02f;
-            last_ms = now;
-            next_ms = now + DT_MS;
+            last_ms = now; next_ms = now + DT_MS;
+            float fx = (float)filter_x(), fy = (float)filter_y();
 
-            float fy   = (float)filter_y();
-            float err  = -fy;
-            float out  = 0;
+            uint8_t yd, xd, yr, xr;
+            axis_calc(&y_axis, fy, -fy, dt, now, &yd, &yr);
+            axis_calc(&x_axis, fx,  fx, dt, now, &xd, &xr);
+            y_axis.cur_dir = yd; y_axis.running = yr;
+            x_axis.cur_dir = xd; x_axis.running = xr;
+            motors_apply(&y_axis, &x_axis);
 
-            /* 状态切换 */
-            switch (state) {
-            case IDLE:
-                if (enabled && found_cnt >= DEBOUNCE) {
-                    state = TRACK;
-                    pid.integral = 0; pid.prev_err = 0;
-                }
-                break;
-            case TRACK:
-                if (lost_cnt >= DEBOUNCE) {
-                    state = SEARCH;
-                    search_t0 = now;
-                    pid.integral = 0; pid.prev_err = 0;
-                }
-                break;
-            case SEARCH:
-                if (found_cnt >= DEBOUNCE) {
-                    state = TRACK;
-                    pid.integral = 0; pid.prev_err = 0;
-                } else if ((int32_t)(now - search_t0) >= SEARCH_TO) {
-                    state = IDLE;
-                }
-                break;
-            }
-
-            /* 状态执行 */
-            switch (state) {
-            case IDLE:
-                if (cur_hz != 0) { stepper_stop(STEP1); cur_hz = 0; }
-                break;
-
-            case SEARCH:
-                if (last_dir) {
-                    uint8_t d = last_dir - 1;
-                    if (cur_hz != SEARCH_HZ || cur_dir != d) {
-                        stepper_set_dir(STEP1, d);
-                        stepper_set_speed(STEP1, SEARCH_HZ);
-                        stepper_run(STEP1, SEARCH_HZ);
-                        cur_hz = SEARCH_HZ; cur_dir = d;
-                    }
-                }
-                break;
-
-            case TRACK:
-                out = pid_step(&pid, err, dt);
-                /* 记录方向供搜索 */
-                if (fy > 8)      last_dir = 2;
-                else if (fy < -8) last_dir = 1;
-
-                if (err > -DEADBAND && err < DEADBAND) {
-                    if (cur_hz != 0) { stepper_stop(STEP1); cur_hz = 0; }
-                } else {
-                    uint8_t  d = (out > 0) ? 1 : 0;
-                    uint16_t h = (uint16_t)(out > 0 ? out : -out);
-                    if (h < 30) h = 30;
-                    if (h > OUT_MAX) h = OUT_MAX;
-                    if (h != cur_hz || d != cur_dir) {
-                        if (d != cur_dir) stepper_set_dir(STEP1, d);
-                        stepper_set_speed(STEP1, h);
-                        stepper_run(STEP1, h);
-                        cur_hz = h; cur_dir = d;
-                    }
-                }
-                break;
-            }
-
-            char buf[80];
-            sprintf(buf, "fy=%.0f S=%d L=%d out=%.0f hz=%d\r\n",
-                    fy, state, lost_cnt, out, cur_hz);
+            char buf[100];
+            sprintf(buf, "fy=%.0f Sy=%d rY=%d | fx=%.0f Sx=%d rX=%d\r\n",
+                    fy, y_axis.state, yr, fx, x_axis.state, xr);
             wireless_uart_send_string(buf);
         }
         stepper_tick();
