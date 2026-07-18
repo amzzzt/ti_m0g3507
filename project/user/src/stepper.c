@@ -24,7 +24,8 @@ typedef struct {
     gpio_pin_enum en, dir;
     uint8_t running;
     uint32_t stop_tick;
-    uint16_t speed;
+    uint16_t speed;       // pwm_init 请求频率
+    uint8_t  clock_div;   // 实际频率 = speed / clock_div (TIMA1=2, TIMG=1)
 } stepper_t;
 
 static stepper_t g_step[2];
@@ -39,6 +40,7 @@ void stepper_init(stepper_id_t id)
     }
     s->running = 0;
     s->speed = 1000;
+    s->clock_div = 2;   // BUSCLK=40MHz, 库算用80MHz, 实际=请求/2
     gpio_init(s->en,  GPO, 1, GPO_PUSH_PULL);
     gpio_init(s->dir, GPO, 0, GPO_PUSH_PULL);
 }
@@ -72,7 +74,8 @@ void stepper_rotate(stepper_id_t id, float deg)
     else         stepper_set_dir(id, 1);
     uint32_t steps = (uint32_t)(deg / PULSE_DEG + 0.5f);
     if (steps == 0) return;
-    uint32_t dur = steps * 1000 / s->speed;
+    uint32_t actual_hz = s->speed / s->clock_div;
+    uint32_t dur = steps * 1000 / actual_hz;
     if (dur < 1) dur = 1;
     pwm_init(s->pwm, s->speed, DUTY);
     s->stop_tick = tick_get() + dur;

@@ -1,6 +1,6 @@
 /**
- * main.c — 双电机时钟补偿测试
- *   M1(TIMA1): 2000→实际~1000Hz   M2(TIMG6): 1000→实际~1000Hz
+ * main.c — 双电机慢速来回90度
+ *   M1: A16(TIMA1)  M2: B6(TIMG6)
  */
 #include "zf_common_headfile.h"
 #include "tick.h"
@@ -11,18 +11,18 @@ int main(void) {
     tick_init();
     stepper_init(STEP1);
     stepper_init(STEP2);
-    stepper_set_speed(STEP1, 2000);
-    stepper_set_speed(STEP2, 1000);
+    stepper_set_speed(STEP1, 800);
+    stepper_set_speed(STEP2, 800);
     stepper_enable(STEP1);
     stepper_enable(STEP2);
-    stepper_set_dir(STEP1, 1);
-    stepper_set_dir(STEP2, 1);
 
+    uint8_t dir = 1;
     while (1) {
-        stepper_rotate(STEP1, 3600.0f);
-        stepper_rotate(STEP2, 3600.0f);
+        stepper_rotate(STEP1, dir ? 90.0f : -90.0f);
+        stepper_rotate(STEP2, dir ? 90.0f : -90.0f);
         while (stepper_is_running(STEP1) || stepper_is_running(STEP2)) {
             stepper_tick();
         }
+        dir = !dir;
     }
 }
