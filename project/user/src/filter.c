@@ -3,7 +3,7 @@
  */
 #include "filter.h"
 
-#define ALPHA      0.5f         // 低通系数 (0~1, 越大响应越快)
+#define ALPHA      0.75f        // 低通系数 (0~1, 越大响应越快)
 #define V_DECAY    0.85f        // 零帧时速度衰减
 #define ZERO_MAX   8            // 连续零帧上限, 超出发认为目标丢失
 

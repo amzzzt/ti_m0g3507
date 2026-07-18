@@ -44,6 +44,8 @@ void stepper_init(stepper_id_t id)
     s->clock_div = 2;   // BUSCLK=40MHz, 库算用80MHz, 实际=请求/2
     gpio_init(s->en,  GPO, 1, GPO_PUSH_PULL);
     gpio_init(s->dir, GPO, 0, GPO_PUSH_PULL);
+    /* STEP 引脚先拉低防浮空, pwm_init 会重新配 AF */
+    gpio_init((gpio_pin_enum)(s->pwm & PWM_PIN_INDEX_MASK), GPO, 0, GPO_PUSH_PULL);
 }
 
 void stepper_enable(stepper_id_t id)  { gpio_low(g_step[id].en); }
