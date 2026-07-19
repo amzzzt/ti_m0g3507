@@ -50,7 +50,7 @@ void control_force_state(control_t *c, ctrl_state_t st) {
 }
 
 uint8_t control_is_locked(control_t *c) {
-    return (c->state == CS_LOCK && c->cur_hz == 0) ? 1 : 0;
+    return ((c->state == CS_LOCK || c->state == CS_TRACE) && c->cur_hz == 0) ? 1 : 0;
 }
 
 void control_feed(control_t *c, uint8_t is_lost, uint8_t is_zero) {
@@ -74,7 +74,10 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
             { c->state = CS_SEARCH; c->search_t0 = now; c->search_phase = 0; c->pid.integral = 0; }
         break;
     case CS_LOCK:
-        /* LOCK 模式手动切换, 不自动退出 */
+    case CS_TRACE:
+        if (c->lost_cnt >= c->debounce) {
+            c->state = CS_SEARCH; c->search_t0 = now;
+        }
         break;
     case CS_SEARCH:
         if (c->found_cnt >= c->debounce)
@@ -107,6 +110,23 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
         if (target > 150) target = 150;
         /* 死区5Hz: 只在大变化时更新, 避免 PWM 微小重设 */
         if (target > c->lock_hz_smooth + 5 || target < c->lock_hz_smooth - 5)
+            c->lock_hz_smooth = target;
+        hz = (uint16_t)c->lock_hz_smooth;
+        if (hz < 1) hz = 1;
+        break;
+    }
+    case CS_TRACE: {
+        float ae = (err > 0) ? err : -err;
+        if (ae <= c->lock_db) {
+            hz = 0; c->lock_hz_smooth = 0;
+            break;
+        }
+        dir = (err > 0) ? 1 : 0;
+        /* 超低速: ae*0.5 Hz, min=4, max=25 */
+        float target = 0.5f * ae;
+        if (target < 4)   target = 4;
+        if (target > 25)  target = 25;
+        if (target > c->lock_hz_smooth + 3 || target < c->lock_hz_smooth - 3)
             c->lock_hz_smooth = target;
         hz = (uint16_t)c->lock_hz_smooth;
         if (hz < 1) hz = 1;

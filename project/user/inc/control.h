@@ -7,7 +7,7 @@
 #include "stepper.h"
 
 typedef struct { float Kp, Ki, integral, prev_err; } pid_t;
-typedef enum { CS_IDLE, CS_TRACK, CS_SEARCH, CS_LOCK } ctrl_state_t;
+typedef enum { CS_IDLE, CS_TRACK, CS_SEARCH, CS_LOCK, CS_TRACE } ctrl_state_t;
 
 typedef struct {
     stepper_id_t motor;

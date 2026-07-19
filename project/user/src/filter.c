@@ -13,6 +13,14 @@ static int16_t  g_lx, g_ly;     // 上一帧滤波值
 static uint8_t  g_zero;         // 连续零帧计数
 static uint32_t g_last_tick;
 
+void filter_reset(int16_t x, int16_t y)
+{
+    g_fx = (float)x; g_fy = (float)y;
+    g_vx = 0; g_vy = 0;
+    g_lx = x; g_ly = y;
+    g_zero = 0;
+}
+
 void filter_init(void)
 {
     g_fx = 0; g_fy = 0;
