@@ -36,7 +36,8 @@ void control_init(control_t *c, stepper_id_t motor, float kp, float ki) {
     c->search_ms = 500;
     /* 精密锁定: lock_db 放宽, 防止远处目标噪声触发假修正 */
     c->lock_hz   = 60;
-    c->lock_db   = 4.0f;
+    c->lock_db   = 3.0f;
+    c->lock_hz_smooth = 0;
 }
 
 void control_force_state(control_t *c, ctrl_state_t st) {
@@ -45,6 +46,7 @@ void control_force_state(control_t *c, ctrl_state_t st) {
     c->stopped = 0;
     c->lost_cnt = 0;
     c->found_cnt = 0;
+    c->lock_hz_smooth = 0;
 }
 
 uint8_t control_is_locked(control_t *c) {
@@ -95,15 +97,19 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
     case CS_LOCK: {
         float ae = (err > 0) ? err : -err;
         if (ae <= c->lock_db) {
-            hz = 0;  /* 锁定: |err|≤4, 容忍远处检测噪声 */
+            hz = 0; c->lock_hz_smooth = 0;
             break;
         }
         dir = (err > 0) ? 1 : 0;
-        /* 比例减速, 50Hz 基准 = 每20ms一步 */
-        if      (ae < 8)   hz = 15;
-        else if (ae < 20)  hz = 30;
-        else if (ae < 40)  hz = 50;
-        else               hz = 80;
+        /* 连续比例: ae*2 Hz, 8~100 */
+        float target = 2.0f * ae;
+        if (target < 8)   target = 8;
+        if (target > 100) target = 100;
+        /* 死区5Hz: 只在大变化时更新, 避免 PWM 微小重设 */
+        if (target > c->lock_hz_smooth + 5 || target < c->lock_hz_smooth - 5)
+            c->lock_hz_smooth = target;
+        hz = (uint16_t)c->lock_hz_smooth;
+        if (hz < 1) hz = 1;
         break;
     }
     case CS_TRACK: {

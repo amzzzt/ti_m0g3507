@@ -25,6 +25,7 @@ typedef struct {
     /* 精密锁定参数 */
     uint16_t     lock_hz;
     float        lock_db;
+    float        lock_hz_smooth;   /* 频率平滑, 防台阶跳变 */
 } control_t;
 
 void control_init(control_t *c, stepper_id_t motor, float kp, float ki);
