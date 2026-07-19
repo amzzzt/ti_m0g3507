@@ -101,10 +101,10 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
             break;
         }
         dir = (err > 0) ? 1 : 0;
-        /* 连续比例: ae*2 Hz, 8~100 */
-        float target = 2.0f * ae;
+        /* 连续比例: ae*3 Hz, 8~150 */
+        float target = 3.0f * ae;
         if (target < 8)   target = 8;
-        if (target > 100) target = 100;
+        if (target > 150) target = 150;
         /* 死区5Hz: 只在大变化时更新, 避免 PWM 微小重设 */
         if (target > c->lock_hz_smooth + 5 || target < c->lock_hz_smooth - 5)
             c->lock_hz_smooth = target;
