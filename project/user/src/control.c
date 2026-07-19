@@ -34,6 +34,21 @@ void control_init(control_t *c, stepper_id_t motor, float kp, float ki) {
     c->search_hz = 150;
     c->debounce  = 15;
     c->search_ms = 500;
+    /* 精密锁定: lock_db 放宽, 防止远处目标噪声触发假修正 */
+    c->lock_hz   = 60;
+    c->lock_db   = 4.0f;
+}
+
+void control_force_state(control_t *c, ctrl_state_t st) {
+    c->state = st;
+    c->pid.integral = 0;
+    c->stopped = 0;
+    c->lost_cnt = 0;
+    c->found_cnt = 0;
+}
+
+uint8_t control_is_locked(control_t *c) {
+    return (c->state == CS_LOCK && c->cur_hz == 0) ? 1 : 0;
 }
 
 void control_feed(control_t *c, uint8_t is_lost, uint8_t is_zero) {
@@ -56,6 +71,9 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
         if (c->lost_cnt >= c->debounce)
             { c->state = CS_SEARCH; c->search_t0 = now; c->search_phase = 0; c->pid.integral = 0; }
         break;
+    case CS_LOCK:
+        /* LOCK 模式手动切换, 不自动退出 */
+        break;
     case CS_SEARCH:
         if (c->found_cnt >= c->debounce)
             { c->state = CS_TRACK; c->pid.integral = 0; c->stopped = 0; }
@@ -74,6 +92,20 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
         if (c->search_phase < 2)
             { dir = (c->search_phase == 0) ? 0 : 1; hz = c->search_hz; }
         break;
+    case CS_LOCK: {
+        float ae = (err > 0) ? err : -err;
+        if (ae <= c->lock_db) {
+            hz = 0;  /* 锁定: |err|≤4, 容忍远处检测噪声 */
+            break;
+        }
+        dir = (err > 0) ? 1 : 0;
+        /* 比例减速, 50Hz 基准 = 每20ms一步 */
+        if      (ae < 8)   hz = 15;
+        else if (ae < 20)  hz = 30;
+        else if (ae < 40)  hz = 50;
+        else               hz = 80;
+        break;
+    }
     case CS_TRACK: {
         float ae = (err > 0) ? err : -err;
         if (c->stopped) {

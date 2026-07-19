@@ -25,6 +25,7 @@ typedef struct {
     uint8_t running;
     uint32_t stop_tick;
     uint16_t speed;       // pwm_init 请求频率
+    uint16_t last_hz;     // 上次 pwm_init 的频率 (防重复重置)
     uint8_t  clock_div;   // 实际频率 = speed / clock_div (BUSCLK=40M, 库算80M → =2)
 } stepper_t;
 
@@ -60,7 +61,11 @@ void stepper_run(stepper_id_t id, uint16_t hz)
     stepper_t *s = &g_step[id];
     s->running = 1;
     s->stop_tick = 0;
-    pwm_init(s->pwm, hz, DUTY);
+    /* 同频率不重设, 避免 pwm_init 重置定时器产生额外 STEP 边沿 */
+    if (hz != s->last_hz) {
+        s->last_hz = hz;
+        pwm_init(s->pwm, hz, DUTY);
+    }
 }
 
 void stepper_stop(stepper_id_t id)
