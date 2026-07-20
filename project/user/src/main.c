@@ -1,5 +1,10 @@
 /**
- * main.c — 绕框描边测试 (CS_TRACE)
+ * main.c — 梯形加减速测试 (全在主函数, 不改模块)
+ *
+ * 原理: control_update 输出"目标Hz", main.c 用 slew rate 限制后
+ *       再送给 motor_run, 模拟梯形速度曲线.
+ *       SLEW_UP=20 → 每20ms最多加速20Hz → 1000Hz/s
+ *       SLEW_DN=40 → 每20ms最多减速40Hz → 2000Hz/s
  */
 #include "zf_common_headfile.h"
 #include "zf_device_wireless_uart.h"
@@ -23,8 +28,8 @@ int main(void) {
     clock_init(SYSTEM_CLOCK_80M);
     tick_init();
 
-    gpio_init(A12, GPO, 1, GPO_PUSH_PULL);  /* M1 EN */
-    gpio_init(A8,  GPO, 1, GPO_PUSH_PULL);  /* M2 EN */
+    gpio_init(A12, GPO, 1, GPO_PUSH_PULL);
+    gpio_init(A8,  GPO, 1, GPO_PUSH_PULL);
 
     wireless_uart_init();
     protocol_init(115200);
@@ -48,19 +53,13 @@ int main(void) {
             control_feed(&y_ctrl, lost, zero);
             control_feed(&x_ctrl, lost, zero);
             if (!lost && !zero) {
-                /* 拐角检测: 新坐标突变>15px → 跳过滤波, 直设目标 */
-                int16_t fx0 = filter_x(), fy0 = filter_y();
-                int32_t jump = (int32_t)(o.dx - fx0) * (o.dx - fx0)
-                             + (int32_t)(o.dy - fy0) * (o.dy - fy0);
-                if (jump > 225)  /* sqrt(225)=15px */
-                    filter_reset(o.dx, o.dy);
-                else
-                    filter_update(o.dx, o.dy, tick_get());
+                filter_update(o.dx, o.dy, tick_get());
                 if (!y_ctrl.enabled && ++y_ctrl.frm_cnt > 20) {
                     stepper_enable(STEP1); y_ctrl.enabled = 1;
                     stepper_enable(STEP2); x_ctrl.enabled = 1;
-                    control_force_state(&y_ctrl, CS_TRACE);
-                    control_force_state(&x_ctrl, CS_TRACE);
+                    /* 默认进 CS_LOCK: ae×2, 8~300Hz */
+                    control_force_state(&y_ctrl, CS_LOCK);
+                    control_force_state(&x_ctrl, CS_LOCK);
                 }
             }
         }

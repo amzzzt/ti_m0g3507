@@ -17,6 +17,7 @@ typedef struct {
     uint8_t      cur_dir;
     uint32_t     search_t0;
     uint8_t      search_phase;
+    int8_t       chase_dir;
     uint8_t      lost_cnt, found_cnt, enabled;
     uint16_t     frm_cnt;
     uint8_t      stopped;
