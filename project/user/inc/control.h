@@ -7,7 +7,7 @@
 #include "stepper.h"
 
 typedef struct { float Kp, Ki, integral, prev_err; } pid_t;
-typedef enum { CS_IDLE, CS_TRACK, CS_SEARCH, CS_LOCK, CS_TRACE } ctrl_state_t;
+typedef enum { CS_IDLE, CS_TRACK, CS_SEARCH, CS_LOCK, CS_TRACE, CS_SCAN } ctrl_state_t;
 
 typedef struct {
     stepper_id_t motor;
@@ -27,6 +27,8 @@ typedef struct {
     uint16_t     lock_hz;
     float        lock_db;
     float        lock_hz_smooth;   /* 频率平滑, 防台阶跳变 */
+    /* 开机扫描参数 */
+    uint16_t     scan_hz;
 } control_t;
 
 void control_init(control_t *c, stepper_id_t motor, float kp, float ki);

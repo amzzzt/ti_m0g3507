@@ -49,6 +49,9 @@ void control_init(control_t *c, stepper_id_t motor, float kp, float ki) {
     c->lock_db   = 3.0f;
     c->lock_hz_smooth = 0;
 
+    /* CS_SCAN 参数 */
+    c->scan_hz   = 150;
+
     /* CS_SEARCH 参数 */
     c->search_hz = 100;
     c->debounce  = 15;
@@ -90,22 +93,18 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
             { c->state = CS_TRACK; c->stopped = 0; c->pid.integral = 0; }
         break;
 
-    case CS_TRACK:
-        if (c->lost_cnt >= c->debounce) {
-            c->chase_dir = c->cur_dir;
-            c->state = CS_SEARCH; c->search_t0 = now;
-            c->pid.integral = 0;
-        }
+    case CS_SCAN:
+        /* SCAN 就是扫, 不触发丢失 — 切LOCK由main.c管 */
         break;
 
+    /* 三模式统一丢目标处理: 丢失→SEARCH追赶→超时→IDLE */
     case CS_LOCK:
-        /* LOCK 绝不出逃: 不切 SEARCH, 不切 TRACK */
-        break;
-
+    case CS_TRACK:
     case CS_TRACE:
         if (c->lost_cnt >= c->debounce) {
             c->chase_dir = c->cur_dir;
             c->state = CS_SEARCH; c->search_t0 = now;
+            c->pid.integral = 0;
         }
         break;
 
@@ -122,6 +121,11 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
     case CS_IDLE:
         break;
 
+    /* ========== CS_SCAN: 开机旋转扫描寻目标 ========== */
+    case CS_SCAN:
+        if (c->motor == STEP2) { dir = 1; hz = c->scan_hz; }  /* X轴(STEP2)旋转 */
+        break;
+
     /* ========== CS_SEARCH: 目标丢失, 朝脱离方向追赶 ========== */
     case CS_SEARCH:
         dir = c->chase_dir;
@@ -132,22 +136,22 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
      * |err|≤3 → 锁死, hz=0
      * |err|>3 → ae*2 比例降速, 8~300Hz
      */
-    case CS_LOCK:
+    case CS_LOCK: {
+        float ae = (err > 0) ? err : -err;
         if (ae <= c->lock_db) {
             hz = 0; c->lock_hz_smooth = 0;
             break;
         }
         dir = (err > 0) ? 1 : 0;
-        {
-            float target = 2.0f * ae;
-            if (target < 8)   target = 8;
-            if (target > 300) target = 300;
-            if (target > c->lock_hz_smooth + 5 || target < c->lock_hz_smooth - 5)
-                c->lock_hz_smooth = target;
-            hz = (uint16_t)c->lock_hz_smooth;
-            if (hz < 1) hz = 1;
-        }
+        float target = 2.0f * ae;
+        if (target < 8)   target = 8;
+        if (target > 100) target = 100;
+        if (target > c->lock_hz_smooth + 5 || target < c->lock_hz_smooth - 5)
+            c->lock_hz_smooth = target;
+        hz = (uint16_t)c->lock_hz_smooth;
+        if (hz < 1) hz = 1;
         break;
+    }
 
     /* ========== CS_TRACE: 绕框描边 ========== *
      * 超低速: ae*0.5 Hz, 4~25
