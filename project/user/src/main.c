@@ -48,6 +48,7 @@
 #include "filter.h"
 #include "stepper.h"
 #include "control.h"
+#include "track.h"
 
 static void motor_run(stepper_id_t id, uint16_t hz, uint8_t dir) {
     if (hz) { stepper_set_dir(id, dir); stepper_set_speed(id, hz); stepper_run(id, hz); }
@@ -56,10 +57,11 @@ static void motor_run(stepper_id_t id, uint16_t hz, uint8_t dir) {
 
 int main(void) {
     clock_init(SYSTEM_CLOCK_80M);
-    tick_init();
     gpio_init(A12, GPO, 1, GPO_PUSH_PULL);
     gpio_init(A8,  GPO, 1, GPO_PUSH_PULL);
     wireless_uart_init();
+    track_init();       /* 必须在tick_init之前, GPIO配好再开中断 */
+    tick_init();
     protocol_init(115200);
     filter_init();
     stepper_init(STEP1);
@@ -113,6 +115,10 @@ int main(void) {
                             (control_is_locked(&y_ctrl) && control_is_locked(&x_ctrl))
                                 ? "HOLD" : "",
                             control_get_hz(&y_ctrl), control_get_hz(&x_ctrl));
+                    wireless_uart_send_string(buf);
+                    sprintf(buf, "T:%d%d%d%d%d%d%d%d\r\n",
+                        track_value(0),track_value(1),track_value(2),track_value(3),
+                        track_value(4),track_value(5),track_value(6),track_value(7));
                     wireless_uart_send_string(buf);
                 }
             }
