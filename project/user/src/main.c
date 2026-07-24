@@ -1,12 +1,46 @@
 /**
- * main.c — 五模式双轴控制
- *
- * CS_SCAN   开机X轴旋转找目标 → 找到切CS_CIRCLE
- * CS_TRACK  快速追踪: PID 50~600Hz
- * CS_LOCK   精准锁定: ae×2, 8~100Hz
- * CS_TRACE  绕框描边: ae×0.5, 4~25Hz
- * CS_CIRCLE 寻圈: ae×1.5, 8~75Hz (丢→追→停)
+ * main.c — 精密锁定 CS_LOCK
  */
+// ============ 直角转弯测试(注释保留) ============
+// #include "zf_common_headfile.h"
+// #include "zf_device_wireless_uart.h"
+// #include "zf_device_imu660rc.h"
+// #include "stepper.h"
+// static float yaw_read(void) {
+//     float y = imu660rc_yaw;
+//     if (y != y || y > 1e4f || y < -1e4f) y = 0;
+//     return y;
+// }
+// int main(void) {
+//     clock_init(SYSTEM_CLOCK_80M);
+//     wireless_uart_init();
+//     stepper_init(STEP2);
+//     stepper_enable(STEP2);
+//     imu660rc_init(IMU660RC_QUARTERNION_60HZ);
+//     system_delay_ms(500);
+//     float yaw_start = yaw_read();
+//     float target = yaw_start + 90.0f;
+//     if (target >= 360.0f) target -= 360.0f;
+//     stepper_set_dir(STEP2, 1);
+//     stepper_run(STEP2, 100);
+//     char buf[64];
+//     sprintf(buf, "START %.1f -> %.1f\r\n", yaw_start, target);
+//     wireless_uart_send_string(buf);
+//     while (1) {
+//         system_delay_ms(20);
+//         float yaw = yaw_read();
+//         float diff = yaw - yaw_start;
+//         if (diff < 0) diff += 360.0f;
+//         if (diff >= 88.0f) {
+//             stepper_stop(STEP2);
+//             sprintf(buf, "DONE %.1f\r\n", yaw);
+//             wireless_uart_send_string(buf);
+//             while (1) system_delay_ms(100);
+//         }
+//     }
+// }
+// ============ 直角转弯测试结束 ============
+
 #include "zf_common_headfile.h"
 #include "zf_device_wireless_uart.h"
 #include "tick.h"
@@ -35,77 +69,47 @@ int main(void) {
     control_init(&y_ctrl, STEP1, 3.5f, 0.2f);
     control_init(&x_ctrl, STEP2, 3.5f, 0.2f);
 
-    /* 开机: CS_SCAN旋转找目标 */
+    /* 开机进精准锁定 */
     stepper_enable(STEP1); y_ctrl.enabled = 1;
     stepper_enable(STEP2); x_ctrl.enabled = 1;
-    control_force_state(&y_ctrl, CS_SCAN);
-    control_force_state(&x_ctrl, CS_SCAN);
-    uint8_t  scanning = 1;
-    uint16_t scan_cnt = 0;
+    control_force_state(&y_ctrl, CS_LOCK);
+    control_force_state(&x_ctrl, CS_LOCK);
 
-    uint32_t next_ms = 0, last_ms = 0, last_data = 0;
     static int16_t raw_dx, raw_dy;
 
     while (1) {
         offset_t o = protocol_get();
         if (o.updated) {
-            last_data = tick_get();
             raw_dx = o.dx; raw_dy = o.dy;
             uint8_t lost = !o.found;
             uint8_t zero = (o.dx == 0 && o.dy == 0);
-            control_feed(&y_ctrl, lost, zero);
-            control_feed(&x_ctrl, lost, zero);
-
-            /* 扫描中: 连续10帧有效→切CS_CIRCLE */
-            if (scanning && !lost && !zero) {
-                if (++scan_cnt > 10) {
-                    scanning = 0;
-                    filter_reset(o.dx, o.dy);
-                    control_force_state(&y_ctrl, CS_CIRCLE);
-                    control_force_state(&x_ctrl, CS_CIRCLE);
-                }
-            } else if (scanning && lost) {
-                scan_cnt = 0;
-            }
-
-            /* 非扫描: 正常滤波(拐角>15px直跳) */
-            if (!scanning && !lost && !zero) {
-                int16_t fx0 = filter_x(), fy0 = filter_y();
-                int32_t j = (int32_t)(o.dx-fx0)*(o.dx-fx0)+(int32_t)(o.dy-fy0)*(o.dy-fy0);
-                if (j > 225) filter_reset(o.dx, o.dy);
-                else         filter_update(o.dx, o.dy, tick_get());
-            }
+            if (!lost && !zero) filter_update(o.dx, o.dy, tick_get());
         }
 
-        uint32_t now = tick_get();
-        if ((int32_t)(now - next_ms) >= 0) {
-            float dt = (float)(now - last_ms) * 0.001f;
-            if (dt <= 0) dt = 0.02f;
-            last_ms = now; next_ms = now + 20;
+        /* 控制更新: 全速跑 */
+        {
+            static uint32_t ctrl_last = 0;
+            uint32_t now = tick_get();
+            float dt = (float)(now - ctrl_last) * 0.001f;
+            if (dt <= 0 || dt > 1.0f) dt = 0.02f;
+            ctrl_last = now;
 
             float fx = (float)filter_x(), fy = (float)filter_y();
 
             control_update(&y_ctrl, fy, -fy, dt, now);
             control_update(&x_ctrl, fx,  fx, dt, now);
 
-            /* 收到过数据后500ms无新数据→停转 */
-            if (last_data && (int32_t)(now - last_data) > 500) {
-                motor_run(STEP1, 0, 0);
-                motor_run(STEP2, 0, 0);
-            } else {
-                motor_run(STEP1, control_get_hz(&y_ctrl), control_get_dir(&y_ctrl));
-                motor_run(STEP2, control_get_hz(&x_ctrl), control_get_dir(&x_ctrl));
-            }
+            motor_run(STEP1, control_get_hz(&y_ctrl), control_get_dir(&y_ctrl));
+            motor_run(STEP2, control_get_hz(&x_ctrl), control_get_dir(&x_ctrl));
 
+            /* 100ms 调试打印 */
             {
                 static uint32_t lp = 0;
-                static const char *names[] = {"IDLE","TRACK","SEARCH","LOCK","TRACE","SCAN","CIRCLE"};
                 if ((int32_t)(now - lp) >= 100) {
                     lp = now;
                     char buf[128];
-                    sprintf(buf, "r[%d,%d] f[%.0f,%.0f] %s %s h[%d,%d]\r\n",
+                    sprintf(buf, "r[%d,%d] f[%.0f,%.0f] LOCK %s h[%d,%d]\r\n",
                             raw_dx, raw_dy, fx, fy,
-                            scanning ? "SCAN" : names[y_ctrl.state],
                             (control_is_locked(&y_ctrl) && control_is_locked(&x_ctrl))
                                 ? "HOLD" : "",
                             control_get_hz(&y_ctrl), control_get_hz(&x_ctrl));
