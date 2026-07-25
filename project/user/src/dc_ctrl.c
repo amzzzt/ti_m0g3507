@@ -6,10 +6,10 @@
 #include "motor.h"
 #include "tick.h"
 
-/* PI: Kp=2.0 Ki=0.3 积分限±4000 */
-#define KP  2.0f
+/* PI: Kp=3.0 Ki=0.3 积分限±8000 */
+#define KP  3.0f
 #define KI  0.3f
-#define MAX_I  4000.0f
+#define MAX_I  8000.0f
 
 typedef struct {
     float target;
@@ -64,12 +64,5 @@ void dc_ctrl_stop(void) {
 
 float dc_ctrl_left_speed(void)  { return encoder_left_speed(); }
 float dc_ctrl_right_speed(void) { return encoder_right_speed(); }
-
-void dc_ctrl_stop(void) {
-    motor_stop();
-    g_left.integral  = 0;
-    g_right.integral = 0;
-}
-
-float dc_ctrl_left_speed(void)  { return encoder_left_speed(); }
-float dc_ctrl_right_speed(void) { return encoder_right_speed(); }
+int16_t dc_ctrl_left_out(void)   { return g_left.out; }
+int16_t dc_ctrl_right_out(void)  { return g_right.out; }

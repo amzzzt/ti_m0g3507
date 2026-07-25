@@ -1,7 +1,7 @@
 /**
  * motor.h — TB6612 双电机驱动
  *
- *   左电机: AIN1=A13  AIN2=B27  PWMA=A26 (TIMG7 CH0)
+ *   左电机: AIN1=A13  AIN2=B8   PWMA=A26 (TIMG7 CH0)
  *   右电机: BIN1=A0   BIN2=A1   PWMB=A27 (TIMG7 CH1)
  *   STBY:  A29
  */

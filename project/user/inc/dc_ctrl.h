@@ -14,7 +14,9 @@ void dc_ctrl_set_right(float target_pps);   /* 设右轮目标速度 */
 void dc_ctrl_update(void);                  /* 每10ms调: PID×2 */
 void dc_ctrl_stop(void);
 
-float dc_ctrl_left_speed(void);             /* 读当前实际速度 */
+float dc_ctrl_left_speed(void);
 float dc_ctrl_right_speed(void);
+int16_t dc_ctrl_left_out(void);             /* 当前PWM输出 */
+int16_t dc_ctrl_right_out(void);
 
 #endif
