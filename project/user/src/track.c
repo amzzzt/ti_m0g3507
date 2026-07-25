@@ -5,6 +5,7 @@
  * 每1ms中断全读, 主循环取数组
  */
 #include "zf_driver_gpio.h"
+#include "zf_driver_delay.h"
 #include "track.h"
 
 #define AD0  A27
@@ -16,9 +17,9 @@ static volatile uint8_t g_val[8];    /* 中断写, 主循环读 */
 static const int w[8] = {-7,-5,-3,-1,1,3,5,7};  /* 8路权重 */
 
 static void _select(uint8_t ch) {
-    gpio_set(AD0, (ch>>0)&1);
-    gpio_set(AD1, (ch>>1)&1);
-    gpio_set(AD2, (ch>>2)&1);
+    ((ch>>0)&1) ? gpio_high(AD0) : gpio_low(AD0);
+    ((ch>>1)&1) ? gpio_high(AD1) : gpio_low(AD1);
+    ((ch>>2)&1) ? gpio_high(AD2) : gpio_low(AD2);
 }
 
 void track_init(void) {

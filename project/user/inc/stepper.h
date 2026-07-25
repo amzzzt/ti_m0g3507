@@ -1,5 +1,5 @@
 /**
- * stepper.h — 双路 TMC2209 (TIMA1 CH0+CH1)
+ * stepper.h — 双路 TMC2209 (独立定时器)
  *   M1: EN=A12 DIR=B23 STEP=A16(TIMA1 CH1)
  *   M2: EN=A8  DIR=B4  STEP=A7 (TIMG8 CH0)
  */

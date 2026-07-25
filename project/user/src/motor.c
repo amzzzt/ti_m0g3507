@@ -1,7 +1,7 @@
 /**
  * motor.c — TB6612 直流电机驱动 (TIMG7, 逐飞库)
  *
- *   引脚:  STBY=A29   AIN1=B23   AIN2=B27
+ *   引脚:  STBY=A29   AIN1=A13   AIN2=B27
  *         PWMA=A26 (TIMG7 CH0)   PWMB=A27 (TIMG7 CH1, 预留)
  *
  *   TB6612 真值表:
