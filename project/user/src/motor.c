@@ -68,6 +68,7 @@ void motor_left(int16_t speed)
 
 void motor_right(int16_t speed)
 {
+    speed = -speed;  /* 右电机物理反装 */
     if (speed > 8000) speed = 8000;
     if (speed < -8000) speed = -8000;
 
