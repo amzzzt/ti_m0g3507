@@ -60,18 +60,18 @@ static void _update(spd_t *s, int32_t cur, int sign)
 
     float raw = (float)d * 100.0f;            // → pps
 
-    // 变化率限制: 每次最多跳 ±30 pps, 钳住偶发大毛刺
+    // 变化率限制: 每次最多跳 ±500 pps
     float diff = raw - s->val;
-    if (diff >  30.0f) raw = s->val + 30.0f;
-    if (diff < -30.0f) raw = s->val - 30.0f;
+    if (diff >  500.0f) raw = s->val + 500.0f;
+    if (diff < -500.0f) raw = s->val - 500.0f;
 
     s->val = ALPHA * raw + (1.0f - ALPHA) * s->val;
 }
 
 void encoder_update(void)
 {
-    _update(&sl, l_cnt, -1);
-    _update(&sr, r_cnt,  1);
+    _update(&sl, l_cnt,  1);
+    _update(&sr, r_cnt, -1);
 }
 
 float encoder_left_speed(void)  { return sl.val; }
