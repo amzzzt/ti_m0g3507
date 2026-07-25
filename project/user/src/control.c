@@ -35,9 +35,8 @@ void control_init(control_t *c, stepper_id_t motor, float kp, float ki) {
     c->cur_dir = 0;
     c->stopped = 0;
     c->lost_cnt = 0; c->found_cnt = 0;
-    c->enabled = 0; c->frm_cnt = 0; c->has_seen = 0;
+    c->enabled = 0; c->frm_cnt = 0;
     c->chase_dir = 1;
-    c->last_state = CS_IDLE;
 
     /* CS_TRACK 参数 */
     c->stop_db   = 4;
@@ -64,8 +63,8 @@ void control_force_state(control_t *c, ctrl_state_t st) {
     c->state = st;
     c->pid.integral = 0;
     c->stopped = 0;
-    c->lost_cnt = 0; c->found_cnt = 0;
-    c->has_seen = 0;
+    c->lost_cnt = 0;
+    c->found_cnt = 0;
     c->lock_hz_smooth = 0;
 }
 
@@ -74,14 +73,8 @@ uint8_t control_is_locked(control_t *c) {
 }
 
 void control_feed(control_t *c, uint8_t is_lost, uint8_t is_zero) {
-    if (is_lost) {
-        if (c->has_seen) c->lost_cnt++;
-        c->found_cnt = 0;
-    }
-    else if (!is_zero) {
-        c->found_cnt++; c->lost_cnt = 0;
-        if (c->found_cnt >= 3) c->has_seen = 1;  /* 连续3帧确认真目标, 置位后不掉 */
-    }
+    if (is_lost)         { c->lost_cnt++;  c->found_cnt = 0; }
+    else if (!is_zero)   { c->found_cnt++; c->lost_cnt  = 0; }
 }
 
 uint16_t control_get_hz(control_t *c)  { return c->cur_hz; }
@@ -95,25 +88,31 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
 
     /* ---- 状态切换 ---- */
     switch (c->state) {
+    case CS_IDLE:
+        if (c->enabled && c->found_cnt >= c->debounce)
+            { c->state = CS_TRACK; c->stopped = 0; c->pid.integral = 0; }
+        break;
 
-    /* CS_CIRCLE: 丢失→SEARCH追赶→超时停 */
-    case CS_CIRCLE:
+    case CS_SCAN:
+        /* SCAN 就是扫, 不触发丢失 — 切LOCK由main.c管 */
+        break;
+
+    /* 三模式统一丢目标处理: 丢失→SEARCH追赶→超时→IDLE */
+    case CS_LOCK:
+    case CS_TRACK:
+    case CS_TRACE:
         if (c->lost_cnt >= c->debounce) {
-            c->last_state = CS_CIRCLE;
             c->chase_dir = c->cur_dir;
             c->state = CS_SEARCH; c->search_t0 = now;
+            c->pid.integral = 0;
         }
         break;
 
-    /* SEARCH: 找到→退回原来模式, 超时→IDLE */
     case CS_SEARCH:
         if (c->found_cnt >= c->debounce)
-            { c->state = c->last_state; c->pid.integral = 0; c->stopped = 0; }
+            { c->state = CS_TRACK; c->pid.integral = 0; c->stopped = 0; }
         else if ((int32_t)(now - c->search_t0) >= (int32_t)c->search_ms)
             { c->state = CS_IDLE; }
-        break;
-
-    default:
         break;
     }
 
@@ -153,26 +152,6 @@ void control_update(control_t *c, float fv, float err, float dt, uint32_t now) {
         if (hz < 1) hz = 1;
         break;
     }
-
-    /* ========== CS_CIRCLE: 寻圈 ========== *
-     * 中速: ae*1.5 Hz, 8~75
-     */
-    case CS_CIRCLE:
-        if (ae <= c->lock_db) {
-            hz = 0; c->lock_hz_smooth = 0;
-            break;
-        }
-        dir = (err > 0) ? 1 : 0;
-        {
-            float target = 1.5f * ae;
-            if (target < 8)   target = 8;
-            if (target > 75)  target = 75;
-            if (target > c->lock_hz_smooth + 4 || target < c->lock_hz_smooth - 4)
-                c->lock_hz_smooth = target;
-            hz = (uint16_t)c->lock_hz_smooth;
-            if (hz < 1) hz = 1;
-        }
-        break;
 
     /* ========== CS_TRACE: 绕框描边 ========== *
      * 超低速: ae*0.5 Hz, 4~25

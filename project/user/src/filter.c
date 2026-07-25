@@ -1,5 +1,5 @@
 /**
- * filter.c — 泰山派dx/dy滤波: 低通平滑 + 零帧速度外推
+ * filter.c — 偏差滤波: 低通平滑 + 零帧速度外推
  */
 #include "filter.h"
 

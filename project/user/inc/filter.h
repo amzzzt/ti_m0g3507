@@ -1,5 +1,5 @@
 /**
- * filter.h — 泰山派dx/dy专用滤波 (低通+速度外推)
+ * filter.h — 偏差滤波 (低通+速度外推)
  */
 #ifndef _filter_h_
 #define _filter_h_

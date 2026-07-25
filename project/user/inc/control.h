@@ -7,7 +7,7 @@
 #include "stepper.h"
 
 typedef struct { float Kp, Ki, integral, prev_err; } pid_t;
-typedef enum { CS_IDLE, CS_TRACK, CS_SEARCH, CS_LOCK, CS_TRACE, CS_SCAN, CS_CIRCLE } ctrl_state_t;
+typedef enum { CS_IDLE, CS_TRACK, CS_SEARCH, CS_LOCK, CS_TRACE, CS_SCAN } ctrl_state_t;
 
 typedef struct {
     stepper_id_t motor;
@@ -18,8 +18,7 @@ typedef struct {
     uint32_t     search_t0;
     uint8_t      search_phase;
     int8_t       chase_dir;
-    ctrl_state_t last_state;     /* 丢目标前所在模式 */
-    uint8_t      lost_cnt, found_cnt, enabled, has_seen;
+    uint8_t      lost_cnt, found_cnt, enabled;
     uint16_t     frm_cnt;
     uint8_t      stopped;
     float        stop_db, start_db;

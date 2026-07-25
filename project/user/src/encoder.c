@@ -55,8 +55,8 @@ static void _update(spd_t *s, int32_t cur, int sign)
     int32_t d = (cur - s->last_cnt) * sign;
     s->last_cnt = cur;
 
-    // 异常过滤: 放宽到500, 防无线打印阻塞丢数据
-    if (d > 2000 || d < -2000) return;
+    // 异常值: 10ms 内不可能 >100 脉冲
+    if (d > 100 || d < -100) return;
 
     float raw = (float)d * 100.0f;            // → pps
 
@@ -70,7 +70,7 @@ static void _update(spd_t *s, int32_t cur, int sign)
 
 void encoder_update(void)
 {
-    _update(&sl, l_cnt,  1);
+    _update(&sl, l_cnt, -1);
     _update(&sr, r_cnt,  1);
 }
 
