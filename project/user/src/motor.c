@@ -1,8 +1,8 @@
 /**
  * motor.c — TB6612 直流电机驱动 (TIMG7, 逐飞库)
  *
- *   引脚:  STBY=A29   AIN1=B23   AIN2=B27
- *         PWMA=A26 (TIMG7 CH0)   PWMB=A27 (TIMG7 CH1, 预留)
+ *   引脚:  STBY=A29   AIN1=A13   AIN2=B27
+ *         PWMA=A26 (TIMG7 CH0)   PWMB=A27 (TIMG7 CH1)
  *
  *   TB6612 真值表:
  *   ┌──────┬──────┬───────┬──────────────┐
@@ -20,6 +20,9 @@
 #include "zf_driver_pwm.h"
 #include "zf_driver_gpio.h"
 #include "motor.h"
+#include "encoder.h"
+#include "pid.h"
+#include "tick.h"
 
 #define MOTOR_FREQ  10000   // 10kHz
 
@@ -94,4 +97,59 @@ void motor_stop(void)
     gpio_low(BIN1_PIN); gpio_low(BIN2_PIN);
     pwm_set_duty(PWM_TIM_G7_CH0_A26, 0);
     pwm_set_duty(PWM_TIM_G7_CH1_A27, 0);
+}
+
+// ===================== 速度闭环 =====================
+#define CTRL_KP     1.0f
+#define CTRL_KI     0.08f
+#define CTRL_KD     3.0f
+#define CTRL_MAX    8000
+#define CTRL_KFF    7.0f
+
+static pid_t ctrl_pl, ctrl_pr;
+static uint32_t ctrl_last;
+
+void motor_control_init(void)
+{
+    motor_init();
+    encoder_init();
+    encoder_clear();
+    encoder_filter_reset();
+    pid_init(&ctrl_pl, CTRL_KP, CTRL_KI, CTRL_KD, CTRL_MAX);
+    pid_init(&ctrl_pr, CTRL_KP, CTRL_KI, CTRL_KD, CTRL_MAX);
+    ctrl_last = tick_get();
+}
+
+void motor_control_update(int16_t tgt_l, int16_t tgt_r)
+{
+    uint32_t now = tick_get();
+    if ((int32_t)(now - ctrl_last) < 10) return;
+    ctrl_last = now;
+
+    encoder_update();
+    int sl = (int)encoder_left_speed();
+    int sr = (int)encoder_right_speed();
+    if (sl < 0) sl = -sl;
+    if (sr < 0) sr = -sr;
+
+    float ol = pid_compute(&ctrl_pl, (float)tgt_l, (float)sl);
+    float or = pid_compute(&ctrl_pr, (float)tgt_r, (float)sr);
+    int pl = (int)((float)tgt_l * CTRL_KFF + ol);
+    int pr = (int)((float)tgt_r * CTRL_KFF + or);
+    if (pl >  8000) pl =  8000; if (pl < -8000) pl = -8000;
+    if (pr >  8000) pr =  8000; if (pr < -8000) pr = -8000;
+    motor_left(pl);
+    motor_right(pr);
+}
+
+int16_t motor_control_left_speed(void)
+{
+    int s = (int)encoder_left_speed();
+    return (int16_t)(s < 0 ? -s : s);
+}
+
+int16_t motor_control_right_speed(void)
+{
+    int s = (int)encoder_right_speed();
+    return (int16_t)(s < 0 ? -s : s);
 }

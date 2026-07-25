@@ -1,33 +1,55 @@
 /**
- * track.c — 5 路灰度寻迹: 直接读取 + 加权平均 + 丢线保持
+ * track.c — 8路灰度 (4线多路复用, 沿用原5路引脚)
  *
- *   左→右: A24 B24 A22 A15 A17
- *   权重:  -2  -1   0   1   2
- *   LOW=黑线, 全白时保持上次偏差
+ * AD0=A24  AD1=B24  AD2=A22  OUT=A15
+ * 主循环调 track_read_all, 约400us
  */
 #include "zf_driver_gpio.h"
+#include "zf_driver_delay.h"
 #include "track.h"
 
-static const gpio_pin_enum pins[5] = {A24, B24, A22, A15, A17};
-static const int w[5] = {-2, -1, 0, 1, 2};
-static int    last_raw = 0;
-static int    lost_cnt = 0;
-static float  dev_f    = 0;
-#define ALPHA      0.3f
-#define DEV_DELTA  80     // 偏差变化率限制: ±80/10ms
+#define AD0  A24
+#define AD1  B24
+#define AD2  A22
+#define OUT  A15
 
-void track_init(void)
-{
-    for (int i = 0; i < 5; i++)
-        gpio_init(pins[i], GPI, 0, GPI_PULL_UP);
+static volatile uint8_t g_val[8];
+static const int w[8] = {-7,-5,-3,-1,1,3,5,7};
+
+static void _select(uint8_t ch) {
+    ((ch>>0)&1) ? gpio_high(AD0) : gpio_low(AD0);
+    ((ch>>1)&1) ? gpio_high(AD1) : gpio_low(AD1);
+    ((ch>>2)&1) ? gpio_high(AD2) : gpio_low(AD2);
 }
 
-int track_deviation(void)
-{
-    int sum_w = 0, sum_n = 0;
+void track_init(void) {
+    gpio_init(AD0, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(AD1, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(AD2, GPO, 0, GPO_PUSH_PULL);
+    gpio_init(OUT, GPI, 0, GPI_PULL_UP);
+    for (int i = 0; i < 8; i++) g_val[i] = 1;
+}
 
-    for (int i = 0; i < 5; i++) {
-        if (!gpio_get_level(pins[i])) {   // LOW = 黑线
+void track_read_all(void) {
+    for (uint8_t i = 0; i < 8; i++) {
+        _select(i);
+        system_delay_us(50);
+        g_val[i] = gpio_get_level(OUT);
+    }
+}
+
+int track_value(uint8_t ch) {
+    if (ch > 7) return 1;
+    return (int)g_val[ch];
+}
+
+int track_deviation(void) {
+    int sum_w = 0, sum_n = 0;
+    static int last_raw = 0, lost_cnt = 0;
+    static float dev_f = 0;
+
+    for (int i = 0; i < 8; i++) {
+        if (g_val[i] == 0) {
             sum_w += w[i];
             sum_n++;
         }
@@ -35,28 +57,26 @@ int track_deviation(void)
 
     int raw;
     if (sum_n > 0) {
-        raw = sum_w * 120 / sum_n;
+        raw = sum_w * 60 / sum_n;
         last_raw = raw;
         lost_cnt = 0;
     } else {
-        // 全白丢线: 渐增强力回调
         if (lost_cnt < 20) lost_cnt++;
         int sign = (last_raw >= 0) ? 1 : -1;
         int mag  = (last_raw >= 0) ? last_raw : -last_raw;
         int boost = sign * (mag + lost_cnt * 15);
-        if (boost >  240) boost =  240;
-        if (boost < -240) boost = -240;
+        if (boost >  400) boost =  400;
+        if (boost < -400) boost = -400;
         raw = boost;
     }
 
-    // 变化率限制
     int cur = (int)dev_f;
-    if (raw - cur >  DEV_DELTA) raw = cur + DEV_DELTA;
-    if (raw - cur < -DEV_DELTA) raw = cur - DEV_DELTA;
+    if (raw - cur >  80) raw = cur + 80;
+    if (raw - cur < -80) raw = cur - 80;
 
-    // 低通: 回到中间时快速收敛, 防止过度回调
+    float alpha = 0.3f;
     int mag = (raw >= 0) ? raw : -raw;
-    float alpha = (mag < 50 && cur > 50) || (mag < 50 && cur < -50) ? 0.6f : ALPHA;
+    if ((mag < 50 && cur > 50) || (mag < 50 && cur < -50)) alpha = 0.6f;
     dev_f = alpha * (float)raw + (1.0f - alpha) * dev_f;
     return (int)dev_f;
 }
