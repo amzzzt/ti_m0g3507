@@ -5,7 +5,6 @@
  * 主循环调 track_read_all, 约400us
  */
 #include "zf_driver_gpio.h"
-#include "zf_driver_delay.h"
 #include "tick.h"
 #include "track.h"
 
@@ -39,7 +38,7 @@ void track_read_all(void) {
     uint8_t raw[8];
     for (uint8_t i = 0; i < 8; i++) {
         _select(i);
-        system_delay_us(50);
+        __NOP(); __NOP();  /* 74HC4051 切换 ~20ns, 2 NOP≈25ns 足够 */
         raw[i] = !gpio_get_level(OUT);
     }
     /* 2帧确认: 连续2次一致才更新, 抗噪 */
