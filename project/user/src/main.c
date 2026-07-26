@@ -1,31 +1,29 @@
 /**
- * main.c — 直流电机速度闭环测试
+ * main.c — IMU660RC 陀螺仪测试
  */
 #include "zf_common_headfile.h"
 #include "tick.h"
-#include "motor.h"
-
-#define TARGET  400
+#include "imu.h"
 
 int main(void)
 {
     clock_init(SYSTEM_CLOCK_80M);
     tick_init();
     wireless_uart_init();
-    motor_control_init();
+
+    if (imu_init()) {
+        while (1) { uart_write_string(UART_1, "IMU FAIL\r\n"); system_delay_ms(500); }
+    }
 
     while (1) {
-        motor_control_update(TARGET, TARGET);
+        imu_update();
 
         static uint32_t pt = 0;
         uint32_t now = tick_get();
-        if (now - pt >= 20) {
+        if (now - pt >= 50) {
             pt = now;
-            char buf[48];
-            sprintf(buf, "%d,%d,%d\r\n",
-                    TARGET,
-                    motor_control_left_speed(),
-                    motor_control_right_speed());
+            char buf[40];
+            sprintf(buf, "%.1f\r\n", imu_yaw());
             if (!gpio_get_level(B2))
                 wireless_uart_send_string(buf);
         }

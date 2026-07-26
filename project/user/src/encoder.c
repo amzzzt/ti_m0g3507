@@ -35,7 +35,7 @@ int32_t encoder_right_get(void) { return r_cnt; }
 void    encoder_clear(void)     { l_cnt = r_cnt = 0; }
 
 // ---- 速度: 低通滤波 ----
-#define ALPHA  0.15f
+#define ALPHA  0.35f
 
 typedef struct {
     int32_t last_cnt;
@@ -60,10 +60,10 @@ static void _update(spd_t *s, int32_t cur, int sign)
 
     float raw = (float)d * 100.0f;            // → pps
 
-    // 变化率限制: 每次最多跳 ±500 pps
+    // 变化率限制: 每次最多跳 ±150 pps
     float diff = raw - s->val;
-    if (diff >  500.0f) raw = s->val + 500.0f;
-    if (diff < -500.0f) raw = s->val - 500.0f;
+    if (diff >  150.0f) raw = s->val + 150.0f;
+    if (diff < -150.0f) raw = s->val - 150.0f;
 
     s->val = ALPHA * raw + (1.0f - ALPHA) * s->val;
 }

@@ -1,21 +1,18 @@
 /**
- * imu.h — IMU660RA 陀螺仪/加速度计封装
+ * imu.h — IMU660RC 陀螺仪 (DMP 直接输出角度)
  *
- *   SPI1: B23(SCK) B22(MOSI) B21(MISO) B19(CS)
- *   TIMA0 每 2ms 调 imu_update()
+ *   SPI0: B18(SCK) B17(MOSI) B19(MISO) A2(CS) B24(INT2)
+ *   60Hz DMP 输出 yaw/pitch/roll
  */
 #ifndef _imu_h_
 #define _imu_h_
 
 #include <stdint.h>
 
-uint8_t imu_init(void);                 // 0=成功
-void    imu_update(void);              // 读传感器 + 低通滤波 (每2ms)
-int16_t imu_acc_x(void);               // 滤波后加速度
-int16_t imu_acc_y(void);
-int16_t imu_acc_z(void);
-int16_t imu_gyro_x(void);              // 滤波后角速度
-int16_t imu_gyro_y(void);
-int16_t imu_gyro_z(void);
+uint8_t imu_init(void);           /* 0=成功 */
+void    imu_update(void);         /* 读 DMP, 更新角度 */
+float   imu_yaw(void);            /* 偏航角 ° */
+float   imu_pitch(void);          /* 俯仰角 ° */
+float   imu_roll(void);           /* 横滚角 ° */
 
 #endif

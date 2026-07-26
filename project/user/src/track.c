@@ -1,20 +1,22 @@
 /**
  * track.c — 8路灰度 (4线多路复用, 沿用原5路引脚)
  *
- * AD0=A24  AD1=B24  AD2=A22  OUT=A15
+ * AD0=A24  AD1=A25  AD2=A22  OUT=A15
  * 主循环调 track_read_all, 约400us
  */
 #include "zf_driver_gpio.h"
 #include "zf_driver_delay.h"
+#include "tick.h"
 #include "track.h"
 
 #define AD0  A24
-#define AD1  B24
+#define AD1  A25
 #define AD2  A22
 #define OUT  A15
 
 static volatile uint8_t g_val[8];
-static const int w[8] = {-7,-5,-3,-1,1,3,5,7};
+static uint8_t hist[8][2];   /* [0]=本帧, [1]=上帧 */
+int dbg_sum_n, dbg_raw;      /* 调试: 最后计算的 sum_n 和 raw */
 
 static void _select(uint8_t ch) {
     ((ch>>0)&1) ? gpio_high(AD0) : gpio_low(AD0);
@@ -27,56 +29,68 @@ void track_init(void) {
     gpio_init(AD1, GPO, 0, GPO_PUSH_PULL);
     gpio_init(AD2, GPO, 0, GPO_PUSH_PULL);
     gpio_init(OUT, GPI, 0, GPI_PULL_UP);
-    for (int i = 0; i < 8; i++) g_val[i] = 1;
+    for (int i = 0; i < 8; i++) {
+        g_val[i] = 0;
+        hist[i][0] = hist[i][1] = 0;
+    }
 }
 
 void track_read_all(void) {
+    uint8_t raw[8];
     for (uint8_t i = 0; i < 8; i++) {
         _select(i);
         system_delay_us(50);
-        g_val[i] = gpio_get_level(OUT);
+        raw[i] = !gpio_get_level(OUT);
+    }
+    /* 2帧确认: 连续2次一致才更新, 抗噪 */
+    for (uint8_t i = 0; i < 8; i++) {
+        if (raw[i] == hist[i][0])
+            g_val[i] = raw[i];
+        hist[i][1] = hist[i][0];
+        hist[i][0] = raw[i];
     }
 }
 
 int track_value(uint8_t ch) {
-    if (ch > 7) return 1;
-    return (int)g_val[ch];
+    if (ch > 7) return 0;
+    return (int)g_val[ch];   /* 1=黑 0=白 */
 }
 
 int track_deviation(void) {
-    int sum_w = 0, sum_n = 0;
-    static int last_raw = 0, lost_cnt = 0;
+    static int last_raw = 0;
+    static uint32_t lost_since = 0;
     static float dev_f = 0;
 
+    /* 少数有效: 0=线, 1=背景 */
+    int sum_p = 0, sum_n = 0;
     for (int i = 0; i < 8; i++) {
-        if (g_val[i] == 0) {
-            sum_w += w[i];
-            sum_n++;
-        }
+        if (g_val[i] == 1) sum_n++;
+    }
+    int target = (sum_n > 4) ? 0 : 1;   /* 少数色是线 */
+
+    sum_p = 0; sum_n = 0;
+    for (int i = 0; i < 8; i++) {
+        if (g_val[i] == target) { sum_p += i; sum_n++; }
     }
 
     int raw;
-    if (sum_n > 0) {
-        raw = sum_w * 60 / sum_n;
+    if (sum_n > 0 && sum_n < 8) {
+        float center = (float)sum_p / (float)sum_n;
+        raw = (int)((center - 3.5f) * 114.0f);
+        if (raw >  400) raw =  400;
+        if (raw < -400) raw = -400;
         last_raw = raw;
-        lost_cnt = 0;
+        lost_since = tick_get();
     } else {
-        if (lost_cnt < 20) lost_cnt++;
-        int sign = (last_raw >= 0) ? 1 : -1;
-        int mag  = (last_raw >= 0) ? last_raw : -last_raw;
-        int boost = sign * (mag + lost_cnt * 15);
-        if (boost >  400) boost =  400;
-        if (boost < -400) boost = -400;
-        raw = boost;
+        /* 丢线: 保持旧值, >300ms归零 */
+        if (tick_get() - lost_since > 300) { raw = 0; last_raw = 0; }
+        else raw = last_raw;
     }
 
-    int cur = (int)dev_f;
-    if (raw - cur >  80) raw = cur + 80;
-    if (raw - cur < -80) raw = cur - 80;
+    dbg_sum_n = sum_n;
+    dbg_raw   = raw;
 
-    float alpha = 0.3f;
-    int mag = (raw >= 0) ? raw : -raw;
-    if ((mag < 50 && cur > 50) || (mag < 50 && cur < -50)) alpha = 0.6f;
-    dev_f = alpha * (float)raw + (1.0f - alpha) * dev_f;
+    /* 低通滤波 */
+    dev_f = 0.5f * (float)raw + 0.5f * dev_f;
     return (int)dev_f;
 }
