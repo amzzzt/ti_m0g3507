@@ -77,13 +77,13 @@
 
 //====================================================Ӳ�� SPI ����====================================================
 #define IMU660RC_SPI_SPEED              ( 8 * 1000 * 1000)                      // Ӳ�� SPI ����
-#define IMU660RC_SPI                    ( SPI_0         )                       // Ӳ�� SPI ��
-#define IMU660RC_SPC_PIN                ( SPI0_SCK_B18  )                       // Ӳ�� SPI SCK ����
-#define IMU660RC_SDI_PIN                ( SPI0_MOSI_B17 )                       // Ӳ�� SPI MOSI ����
-#define IMU660RC_SDO_PIN                ( SPI0_MISO_B19 )                       // Ӳ�� SPI MISO ����
+#define IMU660RC_SPI                    ( SPI_1         )                       // Ӳ�� SPI ��
+#define IMU660RC_SPC_PIN                ( SPI1_SCK_B23  )                       // Ӳ�� SPI SCK ����
+#define IMU660RC_SDI_PIN                ( SPI1_MOSI_B22 )                       // Ӳ�� SPI MOSI ����
+#define IMU660RC_SDO_PIN                ( SPI1_MISO_B21 )                       // Ӳ�� SPI MISO ����
 //====================================================Ӳ�� SPI ����====================================================
 #endif
-#define IMU660RC_CS_PIN                 ( A2  )                                 // CS Ƭѡ����
+#define IMU660RC_CS_PIN                 ( B19 )                                 // CS Ƭѡ����
 #define IMU660RC_CS(x)                  ( (x) ? (gpio_high(IMU660RC_CS_PIN)) : (gpio_low(IMU660RC_CS_PIN)) )
 #define IMU660RC_INT2_PIN               ( B24 )                                 // �ж��ź����ţ��ڶ�ȡ��Ԫ��ʱ��Ҫʹ��
 
