@@ -18,9 +18,10 @@ static int      turn;
 static int      tl, tr;
 
 static int lost(void) {
-    for (int i = 0; i < 8; i++)
-        if (track_value(i) == 0) return 0;
-    return 1;
+    int v0 = track_value(0);
+    for (int i = 1; i < 8; i++)
+        if (track_value(i) != v0) return 0;  /* 有反差=有线 */
+    return 1;  /* 全相同=丢线 */
 }
 
 void course_init(void)       { st = CS_FOLLOW; turn = 1; }
@@ -61,15 +62,11 @@ void course_update(void)
         break;
     }
 
-    case CS_FORWARD: {
-        tl = 400; tr = 400;
-        motor_control_update(400, 400);
-        if (now - t0 < FWD_MS) break;   /* 前1.5s只管走 */
-        static int cnt = 0;
-        if (!lost()) {
-            if (++cnt >= 5) { cnt = 0; st = CS_FOLLOW; }
-        } else { cnt = 0; }
+    case CS_FORWARD:
+        tl = tr = 400;
+        motor_left(3000);
+        motor_right(3000);
+        if (now - t0 >= FWD_MS && !lost()) st = CS_FOLLOW;
         break;
-    }
     }
 }
