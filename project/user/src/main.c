@@ -6,8 +6,7 @@
 #include "track.h"
 #include "motor.h"
 #include "imu.h"
-
-#define BASE_SPEED  400
+#include "course.h"
 
 int main(void)
 {
@@ -30,21 +29,22 @@ int main(void)
     uint32_t t0 = tick_get();
     while (tick_get() - t0 < 2000);
 
+    course_init();
+
     while (1) {
-        int dev = track_deviation();
-        int16_t tgt_l = (int16_t)(BASE_SPEED + dev);
-        int16_t tgt_r = (int16_t)(BASE_SPEED - dev);
-        motor_control_update(tgt_l, tgt_r);
+        course_update();
 
         static uint32_t pt = 0;
         uint32_t now = tick_get();
         if (now - pt >= 50) {
             pt = now;
+            int tl, tr;
+            course_targets(&tl, &tr);
             float yaw = imu_yaw();
             int sl = motor_control_left_speed();
             int sr = motor_control_right_speed();
             char buf[80];
-            sprintf(buf, "%d,%d,%d,%d Y:%.1f\r\n", tgt_l, tgt_r, sl, sr, yaw);
+            sprintf(buf, "C%d %d,%d,%d,%d Y:%.1f\r\n", course_state(), tl, tr, sl, sr, yaw);
             wireless_uart_send_string(buf);
             char dis[16];
             sprintf(dis, "Y:%.1f", yaw);
