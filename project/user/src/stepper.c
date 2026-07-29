@@ -17,7 +17,7 @@
 #define DIR_M2     B4
 
 #define DUTY       5000
-#define PULSE_DEG  0.225f
+#define PULSE_DEG  0.45f    /* 4细分: 800脉冲/圈 */
 
 typedef struct {
     pwm_channel_enum pwm;
