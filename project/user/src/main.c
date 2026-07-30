@@ -13,7 +13,7 @@
 
 /* ========== 小球滤波参数 ========== */
 #define ALPHA       0.4f
-#define JUMP_MAX    80.0f
+#define JUMP_MAX    150.0f      /* 放宽跳变限制, 允许快移 */
 #define V_DECAY     0.85f
 #define LOST_MAX    8
 
