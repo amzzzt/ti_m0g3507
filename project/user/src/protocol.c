@@ -1,7 +1,9 @@
 /**
  * protocol.c — UART0 RX中断, 帧完成即刻更新
  */
-#include "zf_common_headfile.h"
+#include "ti_msp_dl_config.h"
+#include "zf_common_clock.h"
+#include "zf_common_interrupt.h"
 #include "zf_driver_uart.h"
 #include "protocol.h"
 
