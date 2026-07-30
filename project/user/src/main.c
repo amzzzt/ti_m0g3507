@@ -23,6 +23,8 @@
 #define SLEW_MAX    8.0f        /* 每帧最大角度变化 ±8° */
 #define MAX_ANGLE   8.0f        /* 先小幅度调稳, 再逐步放大到20 */
 #define DEADBAND    3.0f        /* 死区 ±3px (只在速度<50时生效) */
+#define KI          0.01f       /* 微量积分, 消静差 */
+#define I_MAX       2.0f        /* 积分限幅 ±2° */
 
 int main(void)
 {
@@ -50,6 +52,7 @@ int main(void)
 
     /* PD */
     float   last_angle = 0.0f;
+    float   integral   = 0.0f;    /* I 项累积, 消静差 */
 
     char buf[80];
 
@@ -80,10 +83,17 @@ int main(void)
                     valid = 1;
                     ball_ok = 1;
 
-                    /* 连续 PD: 直接用滤波器速度 vx 做 D 项 */
+                    /* PID: 直接用滤波器速度 vx 做 D, 微量 I 消静差 */
                     float error = dx_f;
                     float ae = (error > 0 ? error : -error);
-                    angle = KP * error + KD * vx;
+
+                    /* I 项: 缓慢累积, 克服静摩擦 */
+                    integral += error * dt * KI;
+                    if (integral >  I_MAX) integral =  I_MAX;
+                    if (integral < -I_MAX) integral = -I_MAX;
+                    if (ae < DEADBAND)     integral = 0.0f;
+
+                    angle = KP * error + KD * vx + integral;
                     if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
                     if (angle < -MAX_ANGLE) angle = -MAX_ANGLE;
                     if (ae < DEADBAND) {
