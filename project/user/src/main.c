@@ -18,10 +18,11 @@
 #define LOST_MAX    8
 
 /* ========== PD 控制参数 ========== */
-/* PD 三段增益, 见下方计算 */
-#define MAX_ANGLE   25.0f       /* 机械限位 ±25° */
-#define DEADBAND    1.0f        /* 死区 */
-#define TARGET_DX   0           /* 目标位置: 0=中心 */
+#define KP          0.04f       /* P 增益: 100px → 4° */
+#define KD          0.020f      /* D 增益: 500px/s → 10°刹车 */
+#define SLEW_MAX    8.0f        /* 每帧最大角度变化 ±8° */
+#define MAX_ANGLE   8.0f        /* 先小幅度调稳, 再逐步放大到20 */
+#define DEADBAND    3.0f        /* 死区 ±3px (只在速度<50时生效) */
 
 int main(void)
 {
@@ -48,7 +49,6 @@ int main(void)
     int16_t raw_prev = 0;       /* 上一帧原始值, 用于跳变判断 */
 
     /* PD */
-    float   prev_err  = 0.0f;
     float   last_angle = 0.0f;
 
     char buf[80];
@@ -80,28 +80,22 @@ int main(void)
                     valid = 1;
                     ball_ok = 1;
 
-                    /* 控制策略: 两端轻推, 中间滑行 */
-                    float error = dx_f - (float)TARGET_DX;
-                    float deriv = error - prev_err;
-                    prev_err = error;
+                    /* 连续 PD: 直接用滤波器速度 vx 做 D 项 */
+                    float error = dx_f;
                     float ae = (error > 0 ? error : -error);
-
-                    if (ae > 200) {
-                        /* 最远端: 轻推起步 */
-                        angle = (error > 0) ? 25.0f : -25.0f;
-                    } else if (ae > 100) {
-                        /* 远端: 弱P控制 */
-                        angle = 0.08f * error;
-                    } else if (ae > 40) {
-                        /* 中途: 几乎不干预, 让惯性滑 */
-                        angle = 0.03f * error;
-                    } else {
-                        /* 中心附近: 极弱反馈, 慢慢衰减 */
-                        angle = 0.01f * error + 0.02f * deriv;
-                    }
+                    angle = KP * error + KD * vx;
                     if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
                     if (angle < -MAX_ANGLE) angle = -MAX_ANGLE;
-                    if (ae < DEADBAND) angle = 0.0f;
+                    if (ae < DEADBAND) {
+                        float av = (vx > 0 ? vx : -vx);
+                        if (av < 50.0f) angle = 0.0f;  /* 真停了才归零 */
+                    }
+
+                    /* 限幅: 每帧最多变 ±8°, 防甩杆但不削弱刹车 */
+                    float delta = angle - last_angle;
+                    if (delta >  SLEW_MAX) delta =  SLEW_MAX;
+                    if (delta < -SLEW_MAX) delta = -SLEW_MAX;
+                    angle = last_angle + delta;
 
                     last_angle = angle;
                 }
@@ -124,8 +118,11 @@ int main(void)
         }
 
         /* ---- 2. 舵机输出 ---- */
-        if (!ball_ok) {
-            angle = last_angle;     /* 丢球也不松, 保持倾角 */
+        if (!ball_ok && o.updated) {
+            /* 丢球: 每帧衰减 5%, ~1秒回中 */
+            angle *= 0.95f;
+            if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
+            last_angle = angle;
         }
         servo_set_angle((uint8_t)(90.0f + angle));
 
@@ -133,11 +130,12 @@ int main(void)
         // int dev = track_deviation();
         // motor_control_update(BASE_SPEED + dev, BASE_SPEED - dev);
 
-        /* ---- 4. 100ms 串口 ---- */
+        /* ---- 4. 200ms 串口 ---- */
         static uint32_t pt = 0;
-        if (now - pt >= 100) {
+        if (now - pt >= 200) {
             pt = now;
-            sprintf(buf, "%d,%d,%d\r\n", prev, (int)angle, ball_ok);
+            sprintf(buf, "%d,%d,%d,%d,%d\r\n",
+                    (int)o.dx, prev, (int)vx, (int)angle, ball_ok);
             wireless_uart_send_string(buf);
         }
     }
