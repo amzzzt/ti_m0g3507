@@ -18,13 +18,13 @@
 #define LOST_MAX    8
 
 /* ========== PD 控制参数 ========== */
-#define KP          0.04f       /* P 增益: 100px → 4° */
-#define KD          0.020f      /* D 增益: 500px/s → 10°刹车 */
+#define KP          0.04f       /* P 增益: 100px → 4° (稳定基准) */
+#define KD          0.030f      /* D 增益: 500px/s → 15°刹车 (↑阻尼) */
 #define SLEW_MAX    8.0f        /* 每帧最大角度变化 ±8° */
 #define MAX_ANGLE   8.0f        /* 先小幅度调稳, 再逐步放大到20 */
 #define DEADBAND    3.0f        /* 死区 ±3px (只在速度<50时生效) */
-#define KI          0.01f       /* 微量积分, 消静差 */
-#define I_MAX       2.0f        /* 积分限幅 ±2° */
+#define KI          0.02f       /* 微量积分 (温和, 不扰 PD) */
+#define I_MAX       5.0f        /* 积分限幅 ±5° */
 
 int main(void)
 {
@@ -87,11 +87,18 @@ int main(void)
                     float error = dx_f;
                     float ae = (error > 0 ? error : -error);
 
-                    /* I 项: 缓慢累积, 克服静摩擦 */
-                    integral += error * dt * KI;
-                    if (integral >  I_MAX) integral =  I_MAX;
-                    if (integral < -I_MAX) integral = -I_MAX;
-                    if (ae < DEADBAND)     integral = 0.0f;
+                    /* I 项: 只在中心附近(±30px)消静差, 大幅震荡时清零 */
+                    if (ae < 30.0f) {
+                        integral += error * dt * KI;
+                        if (integral >  I_MAX) integral =  I_MAX;
+                        if (integral < -I_MAX) integral = -I_MAX;
+                        {
+                            float av = (vx > 0 ? vx : -vx);
+                            if (ae < DEADBAND && av < 50.0f) integral = 0.0f;
+                        }
+                    } else {
+                        integral = 0.0f;
+                    }
 
                     angle = KP * error + KD * vx + integral;
                     if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
