@@ -10,7 +10,8 @@
 void track_init(void);
 void track_read_all(void);           /* 读8路, 约400us */
 int  track_deviation(void);          /* 加权偏差 -400~+400 */
-int  track_value(uint8_t ch);        /* 读单路值 0=LOW=黑 */
+int  track_value(uint8_t ch);        /* 读单路值 1=黑 0=白 (2帧滤波) */
+int  track_value_raw(uint8_t ch);    /* 读单路值 1=黑 0=白 (不过滤) */
 
 extern int dbg_sum_n, dbg_raw;       /* 调试 */
 

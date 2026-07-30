@@ -52,7 +52,12 @@ void track_read_all(void) {
 
 int track_value(uint8_t ch) {
     if (ch > 7) return 0;
-    return (int)g_val[ch];   /* 1=黑 0=白 */
+    return (int)g_val[ch];   /* 1=黑 0=白 (2帧确认) */
+}
+
+int track_value_raw(uint8_t ch) {
+    if (ch > 7) return 1;
+    return (int)hist[ch][0];   /* 不经过2帧滤波, 0=黑 1=白 */
 }
 
 int track_deviation(void) {
@@ -75,9 +80,9 @@ int track_deviation(void) {
     int raw;
     if (sum_n > 0 && sum_n < 8) {
         float center = (float)sum_p / (float)sum_n;
-        raw = (int)((center - 3.5f) * 114.0f);
-        if (raw >  400) raw =  400;
-        if (raw < -400) raw = -400;
+        raw = (int)((center - 3.5f) * 95.0f);
+        if (raw >  340) raw =  340;
+        if (raw < -340) raw = -340;
         last_raw = raw;
         lost_since = tick_get();
     } else {
@@ -89,7 +94,7 @@ int track_deviation(void) {
     dbg_sum_n = sum_n;
     dbg_raw   = raw;
 
-    /* 低通滤波 */
-    dev_f = 0.5f * (float)raw + 0.5f * dev_f;
+    /* 低通滤波 (更丝滑) */
+    dev_f = 0.30f * (float)raw + 0.70f * dev_f;
     return (int)dev_f;
 }

@@ -1,10 +1,5 @@
 /**
- * mode_line.c — 模式1: 巡线 + 启停线检测
- *
- *   IDLE:  等 KEY1
- *   FOLLOW: track_deviation → motor_control_update(400±dev)
- *           启停线: 最右侧三灯(5/6/7)全黑 + 持续50ms → STOP
- *   STOP:  电机停, TFT显示圈时
+ * mode_line.c — 巡线 + 灰度停车
  */
 #include "zf_common_headfile.h"
 #include "tick.h"
@@ -12,93 +7,104 @@
 #include "motor.h"
 #include "mode_line.h"
 
-typedef enum { S_IDLE, S_FOLLOW, S_STOP } state_t;
+#define BASE_SPEED  590
 
-static state_t  st;
-static uint32_t follow_t0;
-static uint32_t line_t0;
 static uint32_t lap_start;
-
-static int is_stop_line(void) {
-    return track_value(5) == 0
-        && track_value(6) == 0
-        && track_value(7) == 0;
-}
+static uint32_t follow_t0;
+static int      stopped;
+static int      stop_pending;
+static uint32_t stop_t0;
+static uint32_t lap_time;       /* 最终圈时(ms), 停后冻结 */
+static int      line_cnt;
 
 void mode_line_init(void)
 {
-    st = S_IDLE;
-    follow_t0 = 0;
-    line_t0   = 0;
-    lap_start = 0;
-    tft180_show_string(0, 0, "Mode1:Line");
-    tft180_show_string(0, 1, "Press KEY1");
+    tft180_show_string(0, 0, "Press KEY1");
+    while (key_get_state(KEY_1) != KEY_SHORT_PRESS);
+    key_clear_state(KEY_1);
+
+    motor_stop();
+    tft180_show_string(0, 0, "Wait 2s...");
+    uint32_t t0 = tick_get();
+    while (tick_get() - t0 < 2000);
+
+    lap_start = tick_get();
+    follow_t0 = lap_start;
+    stopped      = 0;
+    stop_pending = 0;
+    line_cnt     = 0;
+}
+
+/* TIMA0 ISR 每1ms调用: 用原始值快速检测停车线 */
+void mode_line_stop_isr(void)
+{
+    if (stopped || stop_pending) return;
+
+    uint32_t elapsed = tick_get() - lap_start;
+    if (elapsed < 15000) return;
+
+    /* 通道2~7, 原始值(不过滤), 0=黑 */
+    int black = 0;
+    for (int i = 2; i < 8; i++)
+        if (track_value_raw(i) == 0) black++;
+
+    if (black >= 4) {
+        line_cnt++;
+        if (line_cnt >= 3) {
+            stop_pending = 1;           /* 检测到线, 再跑0.3s */
+            stop_t0 = tick_get();
+        }
+    } else {
+        line_cnt = 0;
+    }
 }
 
 void mode_line_update(void)
 {
     uint32_t now = tick_get();
 
-    switch (st) {
+    int dev = track_deviation();
+    int16_t tgt_l = (int16_t)(BASE_SPEED + dev);
+    int16_t tgt_r = (int16_t)(BASE_SPEED - dev);
 
-    case S_IDLE:
-        motor_stop();
-        if (key_get_state(KEY_1) == KEY_SHORT_PRESS) {
-            key_clear_state(KEY_1);
-            st = S_FOLLOW;
-            follow_t0 = now;
-            lap_start = now;
-            tft180_show_string(0, 0, "FOLLOW  ");
-            tft180_show_string(0, 1, "        ");
+    if (!stopped) {
+        motor_control_update(tgt_l, tgt_r);
+
+        /* 检测到停车线后继续跑0.3秒再停 */
+        if (stop_pending && now - stop_t0 >= 300) {
+            motor_stop();
+            stopped  = 1;
+            lap_time = now - lap_start;     /* 冻结圈时 */
         }
-        break;
-
-    case S_FOLLOW: {
-        int dev = track_deviation();
-        int tl = 400 + dev;
-        int tr = 400 - dev;
-        if (tl >  8000) tl =  8000; if (tl < -8000) tl = -8000;
-        if (tr >  8000) tr =  8000; if (tr < -8000) tr = -8000;
-        motor_control_update((int16_t)tl, (int16_t)tr);
-
-        /* 前500ms不检测 + 持续50ms消抖 */
-        if (now - follow_t0 > 500) {
-            if (is_stop_line()) {
-                if (line_t0 == 0) line_t0 = now;
-                if (now - line_t0 > 50) {
-                    motor_stop();
-                    st = S_STOP;
-                    tft180_show_string(0, 0, "STOP    ");
-                }
-            } else {
-                line_t0 = 0;
-            }
-        }
-        break;
     }
 
-    case S_STOP: {
-        motor_stop();
-        uint32_t lap_ms = now - lap_start;
-        char dis[16];
-        sprintf(dis, "%d.%02ds", (int)(lap_ms/1000), (int)((lap_ms%1000)/10));
-        tft180_show_string(0, 1, dis);
-        break;
-    }
-    }
-
-    /* === 50ms 调试打印 === */
+    /* === 50ms: 灰度停车检测 + 串口 + TFT === */
     static uint32_t pt = 0;
     if (now - pt >= 50) {
         pt = now;
-        int dev = track_deviation();
         int sl = (int)motor_control_left_speed();
         int sr = (int)motor_control_right_speed();
-        uint32_t elapsed = now - lap_start;
-        char buf[64];
-        sprintf(buf, "S:%d D:%d L:%d R:%d T:%d.%02d\r\n",
-                (int)st, dev, sl, sr,
+        uint32_t elapsed = stopped ? lap_time : (now - lap_start);
+
+        /* ISR已处理停车检测, 这里只处理TFT显示 */
+        if (stopped) {
+            tft180_show_string(0, 0, "STOP    ");
+        }
+
+        /* 读取各通道值用于调试 */
+        int v[8];
+        for (int i = 0; i < 8; i++) v[i] = track_value(i);
+
+        char buf[100];
+        sprintf(buf, "%d%d%d%d%d%d%d%d C:%d %s T:%d.%02d\r\n",
+                v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],
+                line_cnt, stopped ? "STOP" : "",
                 (int)(elapsed/1000), (int)((elapsed%1000)/10));
         wireless_uart_send_string(buf);
+
+        char d1[24];
+        sprintf(d1, "C:%d T:%d.%02d", line_cnt,
+                (int)(elapsed/1000), (int)((elapsed%1000)/10));
+        tft180_show_string(0, 1, d1);
     }
 }

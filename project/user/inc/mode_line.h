@@ -6,5 +6,6 @@
 
 void mode_line_init(void);
 void mode_line_update(void);
+void mode_line_stop_isr(void);   /* TIMA0 ISR 每1ms调用 */
 
 #endif
