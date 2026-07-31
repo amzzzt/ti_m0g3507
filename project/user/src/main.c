@@ -11,6 +11,7 @@
 #include "mode_line.h"
 #include "ball_control.h"
 #include "mode_a2b.h"
+#include "ball_seq.h"
 
 /* ========== 球控参数 ========== */
 #define ALPHA       0.70f
@@ -199,57 +200,13 @@ static void task1_line_track(void)
 }
 
 /* ================================================================
- * task2: 小球 0→+125→-125
+ * task2: 小球 0→+106→-140
  * ================================================================ */
 static void task2_ball_seq(void)
 {
-    ball_control_t b;
-    uint32_t lt = tick_get(), t0 = 0, t125 = 0;
-    uint8_t  sc = 0;
-    enum { S_IDLE, S_TO125, S_TO_N125 } st = S_IDLE;
-    char buf[64], dis[20];
-
-    ball_control_init(&b);
-    servo_set_angle(90);
-
+    ball_seq_init();
     while (1) {
-        uint32_t now = tick_get();
-        float angle = ball_control_get_angle(&b);
-        offset_t o = protocol_get();
-
-        if (o.updated) {
-            float dt = (float)(now - lt) * 0.001f; if (dt <= 0.0f) dt = 0.01f;
-            lt = now;
-            ball_control_update(&b, o.dx, o.dy, o.found, dt);
-            if (!ball_control_is_ok(&b)) { angle *= 0.95f; if (angle < 0.5f && angle > -0.5f) angle = 0.0f; }
-        }
-
-        switch (st) {
-        case S_IDLE:
-            if (ball_control_is_ok(&b)) { st = S_TO125; ball_control_set_target(&b, 125.0f); t0 = now; sc = 0; }
-            break;
-        case S_TO125: {
-            float ae = (b.dx_f > 125.0f) ? (b.dx_f - 125.0f) : (125.0f - b.dx_f);
-            float av = (b.vx > 0 ? b.vx : -b.vx);
-            if (ae < ARRIVE_DB && av < ARRIVE_VMAX) { sc++; if (sc >= SETTLE_125) { t125 = now - t0; st = S_TO_N125; ball_control_set_target(&b, -125.0f); sc = 0; } }
-            else sc = 0;
-            break;
-        }
-        case S_TO_N125: break;
-        }
-
-        servo_set_angle((uint8_t)(90.0f + angle));
-
-        { static uint32_t tf = 0;
-          if (now - tf >= 100) { tf = now; uint32_t t = now - t0;
-            if (st == S_IDLE) sprintf(dis, "Wait ball...");
-            else if (st == S_TO125) sprintf(dis, "TO+125 %u.%02us", (unsigned)(t/1000), (unsigned)((t%1000)/10));
-            else sprintf(dis, "TO-125 %u.%02u +%u.%02u", (unsigned)(t/1000), (unsigned)((t%1000)/10), (unsigned)(t125/1000), (unsigned)((t125%1000)/10));
-            tft180_show_string(0, 16, dis); } }
-
-        { static uint32_t pt = 0;
-          if (now - pt >= 200) { pt = now; sprintf(buf, "%d,%d,%d,%d,%d,%d,%d\r\n", (int)o.dx, (int)o.dy, (int)b.dx_f, (int)b.vx, (int)angle, ball_control_is_ok(&b), (int)st); wireless_uart_send_string(buf); } }
-
+        ball_seq_update();
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) { key_clear_state(KEY_4); servo_set_angle(90); return; }
     }
 }
