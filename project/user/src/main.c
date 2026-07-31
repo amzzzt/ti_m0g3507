@@ -13,18 +13,19 @@
 
 /* ========== 小球滤波参数 ========== */
 #define ALPHA       0.70f       /* 位置滤波 (↓延迟, 更快响应) */
-#define ALPHA_V     0.75f       /* 速度滤波 (↓延迟) */
+#define ALPHA_V     0.95f       /* 速度滤波 (即时跟踪) */
 #define JUMP_MAX    150.0f      /* 放宽跳变限制, 允许快移 */
 #define V_DECAY     0.85f
 #define LOST_MAX    8
 
 /* ========== PD 控制参数 ========== */
 #define KP          0.04f       /* P 增益 (低=强刹车, 快收敛) */
-#define KD          1.50f       /* D 增益 (↑↑中低速强阻尼) */
+#define KD          2.20f       /* D 增益 (强刹车抑制振荡) */
 #define D_MAX       16.0f       /* D 项限幅 ±16° */
 #define SLEW_MAX    6.0f        /* 每帧最大角度变化 ±6° */
 #define MAX_ANGLE   16.0f       /* 最大倾角 */
-#define DEADBAND    15.0f       /* 死区 ±15px */
+#define DB_INNER    15.0f       /* 不动区: |error|<15 角度=0 */
+#define DB_OUTER    30.0f       /* 出手区: |error|>30 全PID */
 #define KI          0.05f       /* 积分 (折中) */
 #define I_MAX       5.0f        /* 积分限幅 ±5° (推过卡点) */
 
@@ -94,37 +95,47 @@ int main(void)
                     valid = 1;
                     ball_ok = 1;
 
-                    /* PID: 直接用滤波器速度 vx 做 D, 微量 I 消静差 */
+                    /* === 三区PID: 不动区/过渡带/全控区 === */
                     float error = dx_f;
                     float ae = (error > 0 ? error : -error);
+                    float av = (vx > 0 ? vx : -vx);
 
-                    /* I 项: ±100px消静差, 死区复位防windup */
-                    if (ae < 120.0f) {
-                        integral += error * dt * KI;
-                        if (integral >  I_MAX) integral =  I_MAX;
-                        if (integral < -I_MAX) integral = -I_MAX;
-                        {
-                            float av = (vx > 0 ? vx : -vx);
-                            if (ae < DEADBAND && av < 3.0f) integral = 0.0f;
-                        }
-                    } else {
+                    if (ae < DB_INNER) {
+                        /* 区1: |error|<15, 完全不动 */
+                        angle    = 0.0f;
                         integral = 0.0f;
-                    }
-
-                    {
+                    } else {
+                        /* 计算完整PID */
+                        if (ae < 120.0f) {
+                            integral += error * dt * KI;
+                            if (integral >  I_MAX) integral =  I_MAX;
+                            if (integral < -I_MAX) integral = -I_MAX;
+                        } else {
+                            integral = 0.0f;
+                        }
                         float d_term = KD * vx;
                         if (d_term >  D_MAX) d_term =  D_MAX;
                         if (d_term < -D_MAX) d_term = -D_MAX;
                         angle = KP * error + d_term + integral;
                         if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
                         if (angle < -MAX_ANGLE) angle = -MAX_ANGLE;
-                    }
-                    if (ae < DEADBAND) {
-                        float av = (vx > 0 ? vx : -vx);
-                        if (av < 3.0f) angle = 0.0f;  /* 真停了才归零 */
+
+                        if (ae < DB_OUTER) {
+                            /* 区2: 15~30 过渡带, 速度决定角度上限 */
+                            float limit;
+                            if (av < 1.5f)       limit = 0.5f;
+                            else if (av < 3.0f)  limit = 1.0f;
+                            else if (av < 6.0f)  limit = 2.0f;
+                            else                  limit = 4.0f;
+                            /* 越深越接近全控 */
+                            limit *= (ae - DB_INNER) / (DB_OUTER - DB_INNER);
+                            if (angle >  limit) angle =  limit;
+                            if (angle < -limit) angle = -limit;
+                        }
+                        /* 区3: >30, 全PID无额外限制 */
                     }
 
-                    /* 限幅: 每帧最多变 ±3°, 平滑 */
+                    /* 限幅: 每帧最多变 ±6°, 平滑 */
                     float delta = angle - last_angle;
                     if (delta >  SLEW_MAX) delta =  SLEW_MAX;
                     if (delta < -SLEW_MAX) delta = -SLEW_MAX;
