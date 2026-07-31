@@ -24,8 +24,8 @@
 #define D_MAX       16.0f       /* D 项限幅 ±16° */
 #define SLEW_MAX    6.0f        /* 每帧最大角度变化 ±6° */
 #define MAX_ANGLE   16.0f       /* 最大倾角 */
-#define DEADBAND    20.0f       /* 死区 ±20px */
-#define KI          0.04f       /* 积分 (温和) */
+#define DEADBAND    15.0f       /* 死区 ±15px */
+#define KI          0.05f       /* 积分 (折中) */
 #define I_MAX       5.0f        /* 积分限幅 ±5° (推过卡点) */
 
 int main(void)
