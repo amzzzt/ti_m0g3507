@@ -7,7 +7,11 @@
 #include "motor.h"
 #include "mode_line.h"
 
-#define BASE_SPEED  590
+static int base_speed = 590;
+static int stop_frames = 3;
+
+void mode_line_set_speed(int s)       { base_speed  = s; }
+void mode_line_set_stop_frames(int n) { stop_frames = n; }
 
 static uint32_t lap_start;
 static uint32_t follow_t0;
@@ -19,6 +23,8 @@ static int      line_cnt;
 
 void mode_line_init(void)
 {
+    base_speed  = 590;
+    stop_frames = 3;
     tft180_show_string(0, 0, "Press KEY1");
     while (key_get_state(KEY_1) != KEY_SHORT_PRESS);
     key_clear_state(KEY_1);
@@ -50,7 +56,7 @@ void mode_line_stop_isr(void)
 
     if (black >= 4) {
         line_cnt++;
-        if (line_cnt >= 3) {
+        if (line_cnt >= stop_frames) {
             stop_pending = 1;           /* 检测到线, 再跑0.3s */
             stop_t0 = tick_get();
         }
@@ -64,8 +70,8 @@ void mode_line_update(void)
     uint32_t now = tick_get();
 
     int dev = track_deviation();
-    int16_t tgt_l = (int16_t)(BASE_SPEED + dev);
-    int16_t tgt_r = (int16_t)(BASE_SPEED - dev);
+    int16_t tgt_l = (int16_t)(base_speed + dev);
+    int16_t tgt_r = (int16_t)(base_speed - dev);
 
     if (!stopped) {
         motor_control_update(tgt_l, tgt_r);

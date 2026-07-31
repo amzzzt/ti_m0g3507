@@ -10,6 +10,7 @@
 #include "motor.h"
 #include "mode_line.h"
 #include "ball_control.h"
+#include "mode_a2b.h"
 
 /* ========== 球控参数 ========== */
 #define ALPHA       0.70f
@@ -35,14 +36,15 @@ static const char *task_names[TASK_COUNT] = {
     "0.Ball Ctrl",
     "1.Line+Stop",
     "2.+5cm/-5cm",
-    "3.Line+Ball",
-    "4.(TODO)",
+    "3.A2B+Ball",
+    "4.Line+Ball",
 };
 
 static void task0_ball_track(void);
 static void task1_line_track(void);
 static void task2_ball_seq(void);
 static void task3_line_ball(void);
+static void task4_a2b(void);
 
 int main(void)
 {
@@ -82,7 +84,8 @@ int main(void)
             case 0: task0_ball_track(); break;
             case 1: task1_line_track(); break;
             case 2: task2_ball_seq();  break;
-            case 3: task3_line_ball(); break;
+            case 3: task4_a2b();       break;
+            case 4: task3_line_ball(); break;
             }
             /* 任务返回, 恢复菜单 */
             tft180_set_color(RGB565_WHITE, RGB565_BLACK);
@@ -187,6 +190,7 @@ static void task0_ball_track(void)
 static void task1_line_track(void)
 {
     mode_line_init();
+    mode_line_set_speed(590);
     while (1) {
         mode_line_update();
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) { key_clear_state(KEY_4); motor_stop(); return; }
@@ -261,6 +265,8 @@ static void task3_line_ball(void)
     servo_set_angle(90);
 
     mode_line_init();
+    mode_line_set_speed(413);         /* 590 × 0.7 */
+    mode_line_set_stop_frames(4);     /* 3 × 1.5 ≈ 4 */
 
     while (1) {
         uint32_t now = tick_get();
@@ -291,6 +297,23 @@ static void task3_line_ball(void)
 
         if (KEY_SHORT_PRESS == key_get_state(KEY_4))
         {
+            key_clear_state(KEY_4);
+            motor_stop();
+            servo_set_angle(90);
+            return;
+        }
+    }
+}
+
+/* ================================================================
+ * task4: 从A到B 循迹 + 小球平衡, 7.5秒自动停
+ * ================================================================ */
+static void task4_a2b(void)
+{
+    mode_a2b_init();
+    while (1) {
+        mode_a2b_update();
+        if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
             key_clear_state(KEY_4);
             motor_stop();
             servo_set_angle(90);
