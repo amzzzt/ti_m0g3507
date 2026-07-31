@@ -20,11 +20,11 @@
 
 /* ========== PD 控制参数 ========== */
 #define KP          0.04f       /* P 增益 (低=强刹车, 快收敛) */
-#define KD          1.00f       /* D 增益 (强刹, 快收敛) */
+#define KD          1.50f       /* D 增益 (↑↑中低速强阻尼) */
 #define D_MAX       16.0f       /* D 项限幅 ±16° */
 #define SLEW_MAX    6.0f        /* 每帧最大角度变化 ±6° */
 #define MAX_ANGLE   16.0f       /* 最大倾角 */
-#define DEADBAND    30.0f       /* 死区 ±30px */
+#define DEADBAND    20.0f       /* 死区 ±20px */
 #define KI          0.04f       /* 积分 (温和) */
 #define I_MAX       5.0f        /* 积分限幅 ±5° (推过卡点) */
 
@@ -98,8 +98,8 @@ int main(void)
                     float error = dx_f;
                     float ae = (error > 0 ? error : -error);
 
-                    /* I 项: ±80px消静差, 死区复位防windup */
-                    if (ae < 90.0f) {
+                    /* I 项: ±100px消静差, 死区复位防windup */
+                    if (ae < 120.0f) {
                         integral += error * dt * KI;
                         if (integral >  I_MAX) integral =  I_MAX;
                         if (integral < -I_MAX) integral = -I_MAX;
@@ -116,15 +116,15 @@ int main(void)
                         if (d_term >  D_MAX) d_term =  D_MAX;
                         if (d_term < -D_MAX) d_term = -D_MAX;
                         angle = KP * error + d_term + integral;
+                        if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
+                        if (angle < -MAX_ANGLE) angle = -MAX_ANGLE;
                     }
-                    if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
-                    if (angle < -MAX_ANGLE) angle = -MAX_ANGLE;
                     if (ae < DEADBAND) {
                         float av = (vx > 0 ? vx : -vx);
                         if (av < 3.0f) angle = 0.0f;  /* 真停了才归零 */
                     }
 
-                    /* 限幅: 每帧最多变 ±6°, 平滑优先 */
+                    /* 限幅: 每帧最多变 ±3°, 平滑 */
                     float delta = angle - last_angle;
                     if (delta >  SLEW_MAX) delta =  SLEW_MAX;
                     if (delta < -SLEW_MAX) delta = -SLEW_MAX;
