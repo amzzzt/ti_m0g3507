@@ -81,7 +81,7 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
     int   valid = 0;
 
     /* ---- 有效帧: 滤波 + PID ---- */
-    if (found && dx > -400 && dx < 400) {
+    if (found && dx > -500 && dx < 500) {
         int16_t jump = (dx > b->raw_prev) ? (dx - b->raw_prev)
                                           : (b->raw_prev - dx);
         b->raw_prev = dx;   /* 每帧更新, 避免连锁拒绝 */
@@ -118,7 +118,7 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                 b->integral = 0.0f;
             } else {
                 /* 积分 (大误差不积) */
-                if (ae < 120.0f) {
+                if (ae < 300.0f) {
                     b->integral += error * dt * b->ki;
                     if (b->integral >  b->i_max) b->integral =  b->i_max;
                     if (b->integral < -b->i_max) b->integral = -b->i_max;
