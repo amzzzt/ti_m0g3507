@@ -19,14 +19,14 @@
 #define LOST_MAX    8
 
 /* ========== PD 控制参数 ========== */
-#define KP          0.04f       /* P 增益 (低, 不挡刹车) */
-#define KD          1.00f       /* D 增益 (球刚回就降杆) */
-#define D_MAX       12.0f       /* D 项限幅 ±12° (满刹车权) */
-#define SLEW_MAX    6.0f        /* 每帧最大角度变化 ±6° (平滑优先) */
-#define MAX_ANGLE   12.0f       /* 大误差恢复范围 */
-#define DEADBAND    3.0f        /* 死区 ±3px (只在速度<3时生效) */
-#define KI          0.03f       /* 积分 (↑补精度, P降了靠I) */
-#define I_MAX       5.0f        /* 积分限幅 ±5° */
+#define KP          0.04f       /* P 增益 (低=强刹车, 快收敛) */
+#define KD          1.00f       /* D 增益 (强刹, 快收敛) */
+#define D_MAX       16.0f       /* D 项限幅 ±16° */
+#define SLEW_MAX    6.0f        /* 每帧最大角度变化 ±6° */
+#define MAX_ANGLE   16.0f       /* 最大倾角 */
+#define DEADBAND    30.0f       /* 死区 ±30px */
+#define KI          0.04f       /* 积分 (温和) */
+#define I_MAX       5.0f        /* 积分限幅 ±5° (推过卡点) */
 
 int main(void)
 {
@@ -98,8 +98,8 @@ int main(void)
                     float error = dx_f;
                     float ae = (error > 0 ? error : -error);
 
-                    /* I 项: 只在中心附近(±30px)消静差, 大幅震荡时清零 */
-                    if (ae < 30.0f) {
+                    /* I 项: ±80px消静差, 死区复位防windup */
+                    if (ae < 90.0f) {
                         integral += error * dt * KI;
                         if (integral >  I_MAX) integral =  I_MAX;
                         if (integral < -I_MAX) integral = -I_MAX;
