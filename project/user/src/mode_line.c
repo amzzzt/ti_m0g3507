@@ -20,6 +20,7 @@ static int      stop_pending;
 static uint32_t stop_t0;
 static uint32_t lap_time;       /* 最终圈时(ms), 停后冻结 */
 static int      line_cnt;
+static uint32_t lost_t0;        /* 丢线开始时刻 */
 
 void mode_line_init(void)
 {
@@ -39,6 +40,7 @@ void mode_line_init(void)
     stopped      = 0;
     stop_pending = 0;
     line_cnt     = 0;
+    lost_t0      = 0;
 }
 
 /* TIMA0 ISR 每1ms调用: 用原始值快速检测停车线 */
@@ -74,7 +76,24 @@ void mode_line_update(void)
     int16_t tgt_r = (int16_t)(base_speed - dev);
 
     if (!stopped) {
-        motor_control_update(tgt_l, tgt_r);
+        /* 丢线检测: 8 路全白持续 500ms → 停车 */
+        int seen = 0;
+        for (int i = 0; i < 8; i++)
+            if (track_value_raw(i) == 0) { seen = 1; break; }
+        if (!seen) {
+            if (lost_t0 == 0) lost_t0 = now;
+            if (now - lost_t0 >= 500) {
+                motor_stop();
+                stopped  = 1;
+                lap_time = now - lap_start;
+            }
+        } else {
+            lost_t0 = 0;
+        }
+
+        if (!stopped) {
+            motor_control_update(tgt_l, tgt_r);
+        }
 
         /* 检测到停车线后继续跑0.3秒再停 */
         if (stop_pending && now - stop_t0 >= 300) {

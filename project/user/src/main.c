@@ -266,7 +266,7 @@ static void task3_line_ball(void)
 
     mode_line_init();
     mode_line_set_speed(413);         /* 590 × 0.7 */
-    mode_line_set_stop_frames(4);     /* 3 × 1.5 ≈ 4 */
+    mode_line_set_stop_frames(3);
 
     while (1) {
         uint32_t now = tick_get();
