@@ -108,3 +108,8 @@ void mode_line_update(void)
         tft180_show_string(0, 1, d1);
     }
 }
+
+int mode_line_is_stopped(void)
+{
+    return stopped;
+}

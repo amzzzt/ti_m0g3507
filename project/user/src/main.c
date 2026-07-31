@@ -35,13 +35,14 @@ static const char *task_names[TASK_COUNT] = {
     "0.Ball Ctrl",
     "1.Line+Stop",
     "2.+5cm/-5cm",
-    "3.(TODO)",
+    "3.Line+Ball",
     "4.(TODO)",
 };
 
 static void task0_ball_track(void);
 static void task1_line_track(void);
 static void task2_ball_seq(void);
+static void task3_line_ball(void);
 
 int main(void)
 {
@@ -81,6 +82,7 @@ int main(void)
             case 0: task0_ball_track(); break;
             case 1: task1_line_track(); break;
             case 2: task2_ball_seq();  break;
+            case 3: task3_line_ball(); break;
             }
             /* 任务返回, 恢复菜单 */
             tft180_set_color(RGB565_WHITE, RGB565_BLACK);
@@ -244,5 +246,55 @@ static void task2_ball_seq(void)
           if (now - pt >= 200) { pt = now; sprintf(buf, "%d,%d,%d,%d,%d,%d,%d\r\n", (int)o.dx, (int)o.dy, (int)b.dx_f, (int)b.vx, (int)angle, ball_control_is_ok(&b), (int)st); wireless_uart_send_string(buf); } }
 
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) { key_clear_state(KEY_4); servo_set_angle(90); return; }
+    }
+}
+
+/* ================================================================
+ * task3: 巡线一圈 + 小球平衡, 停车后球控也停
+ * ================================================================ */
+static void task3_line_ball(void)
+{
+    ball_control_t b;
+    uint32_t blt = tick_get();
+
+    ball_control_init(&b);
+    servo_set_angle(90);
+
+    mode_line_init();
+
+    while (1) {
+        uint32_t now = tick_get();
+
+        /* 小球平衡 (停车后不再控制) */
+        if (!mode_line_is_stopped())
+        {
+            float angle = ball_control_get_angle(&b);
+            offset_t o = protocol_get();
+
+            if (o.updated)
+            {
+                float dt = (float)(now - blt) * 0.001f;
+                if (dt <= 0.0f) dt = 0.01f;
+                blt = now;
+                ball_control_update(&b, o.dx, o.dy, o.found, dt);
+                angle = ball_control_get_angle(&b);
+                if (!ball_control_is_ok(&b))
+                {
+                    angle *= 0.95f;
+                    if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
+                }
+            }
+            servo_set_angle((uint8_t)(90.0f + angle));
+        }
+
+        mode_line_update();
+
+        if (KEY_SHORT_PRESS == key_get_state(KEY_4))
+        {
+            key_clear_state(KEY_4);
+            motor_stop();
+            servo_set_angle(90);
+            return;
+        }
     }
 }
