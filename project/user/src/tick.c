@@ -7,6 +7,8 @@
 #include "zf_driver_pit.h"
 #include "tick.h"
 #include "zf_device_key.h"
+#include "track.h"
+#include "mode_line.h"
 
 static volatile uint32_t sys_tick_ms;
 static volatile uint8_t  g_ctrl_flag = 0;
@@ -17,6 +19,8 @@ static void tick_callback(uint32 event, void *ptr)
 {
     (void)event; (void)ptr;
     key_scanner();
+    track_read_all();
+    mode_line_stop_isr();
 
     static uint8_t d10 = 0;
     if (++d10 >= 10) { d10 = 0; g_ctrl_flag = 1; }
