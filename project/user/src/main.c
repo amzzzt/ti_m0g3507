@@ -12,18 +12,20 @@
 #include "protocol.h"
 
 /* ========== 小球滤波参数 ========== */
-#define ALPHA       0.4f
+#define ALPHA       0.70f       /* 位置滤波 (↓延迟, 更快响应) */
+#define ALPHA_V     0.75f       /* 速度滤波 (↓延迟) */
 #define JUMP_MAX    150.0f      /* 放宽跳变限制, 允许快移 */
 #define V_DECAY     0.85f
 #define LOST_MAX    8
 
 /* ========== PD 控制参数 ========== */
-#define KP          0.04f       /* P 增益: 100px → 4° (稳定基准) */
-#define KD          0.030f      /* D 增益: 500px/s → 15°刹车 (↑阻尼) */
-#define SLEW_MAX    8.0f        /* 每帧最大角度变化 ±8° */
-#define MAX_ANGLE   8.0f        /* 先小幅度调稳, 再逐步放大到20 */
-#define DEADBAND    3.0f        /* 死区 ±3px (只在速度<50时生效) */
-#define KI          0.02f       /* 微量积分 (温和, 不扰 PD) */
+#define KP          0.04f       /* P 增益 (低, 不挡刹车) */
+#define KD          1.00f       /* D 增益 (球刚回就降杆) */
+#define D_MAX       12.0f       /* D 项限幅 ±12° (满刹车权) */
+#define SLEW_MAX    6.0f        /* 每帧最大角度变化 ±6° (平滑优先) */
+#define MAX_ANGLE   12.0f       /* 大误差恢复范围 */
+#define DEADBAND    3.0f        /* 死区 ±3px (只在速度<3时生效) */
+#define KI          0.03f       /* 积分 (↑补精度, P降了靠I) */
 #define I_MAX       5.0f        /* 积分限幅 ±5° */
 
 int main(void)
@@ -73,11 +75,20 @@ int main(void)
             int valid = 0;
             if (o.found && o.dx > -300 && o.dx < 300) {
                 int16_t jump = (o.dx > raw_prev) ? (o.dx - raw_prev) : (raw_prev - o.dx);
+                raw_prev = o.dx;  /* 每帧更新, 避免连锁拒绝 */
                 if (ball_ok == 0 || jump <= JUMP_MAX) {
                     /* 首次有效帧或跳变不大: 接受 */
-                    raw_prev = o.dx;
                     dx_f = dx_f * (1.0f - ALPHA) + (float)o.dx * ALPHA;
-                    vx   = (dx_f - (float)prev) / dt;
+                    /* 速度直接用相机的, 不缩放, 独立轻滤 */
+                    {
+                        float cam_v = (float)o.dy;
+                        if (cam_v > -40 && cam_v < 40) {
+                            if (ball_ok == 0)
+                                vx = cam_v;        /* 首帧直接初始化 */
+                            else
+                                vx = vx * (1.0f - ALPHA_V) + cam_v * ALPHA_V;
+                        }
+                    }
                     prev = (int16_t)dx_f;
                     lost = 0;
                     valid = 1;
@@ -94,21 +105,26 @@ int main(void)
                         if (integral < -I_MAX) integral = -I_MAX;
                         {
                             float av = (vx > 0 ? vx : -vx);
-                            if (ae < DEADBAND && av < 50.0f) integral = 0.0f;
+                            if (ae < DEADBAND && av < 3.0f) integral = 0.0f;
                         }
                     } else {
                         integral = 0.0f;
                     }
 
-                    angle = KP * error + KD * vx + integral;
+                    {
+                        float d_term = KD * vx;
+                        if (d_term >  D_MAX) d_term =  D_MAX;
+                        if (d_term < -D_MAX) d_term = -D_MAX;
+                        angle = KP * error + d_term + integral;
+                    }
                     if (angle >  MAX_ANGLE) angle =  MAX_ANGLE;
                     if (angle < -MAX_ANGLE) angle = -MAX_ANGLE;
                     if (ae < DEADBAND) {
                         float av = (vx > 0 ? vx : -vx);
-                        if (av < 50.0f) angle = 0.0f;  /* 真停了才归零 */
+                        if (av < 3.0f) angle = 0.0f;  /* 真停了才归零 */
                     }
 
-                    /* 限幅: 每帧最多变 ±8°, 防甩杆但不削弱刹车 */
+                    /* 限幅: 每帧最多变 ±6°, 平滑优先 */
                     float delta = angle - last_angle;
                     if (delta >  SLEW_MAX) delta =  SLEW_MAX;
                     if (delta < -SLEW_MAX) delta = -SLEW_MAX;
@@ -151,8 +167,8 @@ int main(void)
         static uint32_t pt = 0;
         if (now - pt >= 200) {
             pt = now;
-            sprintf(buf, "%d,%d,%d,%d,%d\r\n",
-                    (int)o.dx, prev, (int)vx, (int)angle, ball_ok);
+            sprintf(buf, "%d,%d,%d,%d,%d,%d\r\n",
+                    (int)o.dx, (int)o.dy, prev, (int)vx, (int)angle, ball_ok);
             wireless_uart_send_string(buf);
         }
     }
