@@ -51,12 +51,12 @@ void mode_line_stop_isr(void)
     uint32_t elapsed = tick_get() - lap_start;
     if (elapsed < 15000) return;
 
-    /* 通道2~7, 原始值(不过滤), 0=黑 */
+    /* 通道3~6, 覆盖起跑线偏移(有时3-4-5黑,有时4-5-6黑), ≥3黑触发 */
     int black = 0;
-    for (int i = 2; i < 8; i++)
+    for (int i = 3; i <= 6; i++)
         if (track_value_raw(i) == 0) black++;
 
-    if (black >= 4) {
+    if (black >= 3) {
         line_cnt++;
         if (line_cnt >= stop_frames) {
             stop_pending = 1;           /* 检测到线, 再跑0.3s */

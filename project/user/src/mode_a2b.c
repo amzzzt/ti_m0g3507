@@ -13,8 +13,9 @@
 #include "ball_control.h"
 #include "mode_a2b.h"
 
-#define BASE_SPEED  385
+#define BASE_SPEED  450
 #define AUTO_STOP_MS 7500
+#define RAMP_MS     800    /* 起跑/停车缓加速总时长 */
 
 typedef enum {
     S_WAIT_KEY,
@@ -69,9 +70,24 @@ void mode_a2b_update(void)
         break;
 
     case S_FOLLOW: {
+        /* 起跑/停车缓加速, 二次曲线: 前慢后快, 减少小球晃动 */
+        float ramp;
+        uint32_t elapsed = now - t0;
+        if (elapsed < RAMP_MS) {
+            float f = (float)elapsed / (float)RAMP_MS;
+            ramp = f * f;                              /* 起跑: 越往后越快 */
+        } else if (elapsed > AUTO_STOP_MS - RAMP_MS) {
+            float f = (float)(AUTO_STOP_MS - elapsed) / (float)RAMP_MS;
+            ramp = 1.0f - (1.0f - f) * (1.0f - f);    /* 停车: 越往后降得越快 */
+            if (ramp < 0.0f) ramp = 0.0f;
+        } else {
+            ramp = 1.0f;
+        }
+        int speed = (int)((float)BASE_SPEED * ramp);
+
         int dev = track_deviation();
-        int16_t tgt_l = (int16_t)(BASE_SPEED + dev);
-        int16_t tgt_r = (int16_t)(BASE_SPEED - dev);
+        int16_t tgt_l = (int16_t)(speed + dev);
+        int16_t tgt_r = (int16_t)(speed - dev);
         motor_control_update(tgt_l, tgt_r);
 
         float angle = ball_control_get_angle(&ball);
