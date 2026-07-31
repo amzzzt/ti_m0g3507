@@ -22,19 +22,21 @@
 #define D_MAX       16.0f
 #define SLEW_MAX    6.0f
 #define MAX_ANGLE   16.0f
-#define DB_INNER    15.0f
-#define DB_OUTER    30.0f
+#define DB_INNER    10.0f
+#define DB_OUTER    20.0f
 #define KI          0.05f
 #define I_MAX       5.0f
 #define ARRIVE_DB   25.0f
 #define ARRIVE_VMAX 5.0f
 #define SETTLE_125  10
-#define TASK_COUNT  3
+#define TASK_COUNT  5
 
 static const char *task_names[TASK_COUNT] = {
-    "1.Ball Track",
-    "2.Line Track",
-    "3.Ball Seq",
+    "0.Ball Ctrl",
+    "1.Line+Stop",
+    "2.+5cm/-5cm",
+    "3.(TODO)",
+    "4.(TODO)",
 };
 
 static void task0_ball_track(void);
@@ -61,18 +63,17 @@ int main(void)
 
     tft180_set_color(RGB565_WHITE, RGB565_BLACK);
     tft180_clear();
-    tft180_show_string(0, 0, "Task No.");
-    sprintf(dis, "%u", (unsigned)num);
-    tft180_show_string(0, 24, dis);
+    tft180_show_string(0, 0, "== Task ==");
+    tft180_show_string(0, 24, (char *)task_names[num]);
 
     while (1) {
         if (KEY_SHORT_PRESS == key_get_state(KEY_3)) {
             key_clear_state(KEY_3);
-            if (num < TASK_COUNT - 1) { num++; sprintf(dis, "%u", (unsigned)num); tft180_show_string(0, 24, dis); }
+            if (num < TASK_COUNT - 1) { num++; tft180_show_string(0, 24, (char *)task_names[num]); }
         }
         if (KEY_SHORT_PRESS == key_get_state(KEY_2)) {
             key_clear_state(KEY_2);
-            if (num > 0) { num--; sprintf(dis, "%u", (unsigned)num); tft180_show_string(0, 24, dis); }
+            if (num > 0) { num--; tft180_show_string(0, 24, (char *)task_names[num]); }
         }
         if (KEY_SHORT_PRESS == key_get_state(KEY_1)) {
             key_clear_state(KEY_1);
@@ -84,9 +85,8 @@ int main(void)
             /* 任务返回, 恢复菜单 */
             tft180_set_color(RGB565_WHITE, RGB565_BLACK);
             tft180_clear();
-            tft180_show_string(0, 0, "Task No.");
-            sprintf(dis, "%u", (unsigned)num);
-            tft180_show_string(0, 24, dis);
+            tft180_show_string(0, 0, "== Task ==");
+            tft180_show_string(0, 24, (char *)task_names[num]);
         }
 
         for (volatile uint32_t d = 0; d < 5000; d++);  /* 微延迟防过冲 */
