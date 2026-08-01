@@ -25,6 +25,8 @@ static uint32_t stop_t0;
 static uint32_t lap_time;       /* 最终圈时(ms), 停后冻结 */
 static int      line_cnt;
 static uint32_t lost_t0;        /* 丢线开始时刻 */
+static float    tgt_l_f = 0.0f; /* 目标速度低通滤波 */
+static float    tgt_r_f = 0.0f;
 
 void mode_line_init(void)
 {
@@ -47,6 +49,8 @@ void mode_line_init(void)
     stop_pending = 0;
     line_cnt     = 0;
     lost_t0      = 0;
+    tgt_l_f      = 0.0f;
+    tgt_r_f      = 0.0f;
 }
 
 /* TIMA0 ISR 每1ms调用: 用原始值快速检测停车线 */
@@ -102,8 +106,15 @@ void mode_line_update(void)
 
     float ramp = ramp_up * ramp_down;
     int ramped = (int)((float)base_speed * ramp);
-    int16_t tgt_l = (int16_t)(ramped + dev);
-    int16_t tgt_r = (int16_t)(ramped - dev);
+
+    /* 目标速度低通滤波, 消除突变 */
+    float desired_l = (float)(ramped + dev);
+    float desired_r = (float)(ramped - dev);
+#define SMOOTH 0.12f
+    tgt_l_f += (desired_l - tgt_l_f) * SMOOTH;
+    tgt_r_f += (desired_r - tgt_r_f) * SMOOTH;
+    int16_t tgt_l = (int16_t)tgt_l_f;
+    int16_t tgt_r = (int16_t)tgt_r_f;
 
     if (!stopped) {
         /* 丢线检测: 8 路全白持续 500ms → 停车 */
