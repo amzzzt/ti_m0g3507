@@ -1,5 +1,5 @@
 /**
- * ball_seq.c — 小球序列: 0→+120→-120
+ * ball_seq.c — 小球序列: 0→+106→-140
  *
  *   从 main.c 原封不动搬过来, 只封装不改逻辑
  */
@@ -31,7 +31,7 @@ void ball_seq_init(void)
     tft180_show_string(0, 0, "Wait 2s...");
     { uint32_t w0 = tick_get(); while (tick_get() - w0 < 2000); }
 
-    ball_control_set_target(&b, 120.0f);
+    ball_control_set_target(&b, 106.0f);
 }
 
 void ball_seq_update(void)
@@ -51,11 +51,11 @@ void ball_seq_update(void)
 
     /* 第一个点: 连续 1 秒 (±15px, |vx|<2) */
     if (st == 0 && ball_control_is_ok(&b)) {
-        float ae = (b.dx_f > 120.0f) ? (b.dx_f - 120.0f) : (120.0f - b.dx_f);
+        float ae = (b.dx_f > 106.0f) ? (b.dx_f - 106.0f) : (106.0f - b.dx_f);
         float av = (b.vx > 0 ? b.vx : -b.vx);
         if (ae < 15.0f && av < 2.0f) {
             settle++;
-            if (settle >= 50) { st = 1; settle = 0; ball_control_set_target(&b, -120.0f); }
+            if (settle >= 50) { st = 1; settle = 0; ball_control_set_target(&b, -140.0f); }
         } else { settle = 0; }
     }
 
