@@ -12,8 +12,9 @@
 #include "ball_control.h"
 #include "mode_a2b.h"
 #include "ball_seq.h"
+#include "init_capture.h"
 
-/* ========== 球控参数 ========== */
+/* ========== 球控参数 (task0 内联用) ========== */
 #define ALPHA       0.70f
 #define ALPHA_V     0.95f
 #define JUMP_MAX    150.0f
@@ -31,7 +32,7 @@
 #define ARRIVE_DB   25.0f
 #define ARRIVE_VMAX 5.0f
 #define SETTLE_125  10
-#define TASK_COUNT  5
+#define TASK_COUNT  6
 
 static const char *task_names[TASK_COUNT] = {
     "0.Ball Ctrl",
@@ -39,6 +40,7 @@ static const char *task_names[TASK_COUNT] = {
     "2.+5cm/-5cm",
     "3.A2B+Ball",
     "4.Line+Ball",
+    "5.InitCap+Line",
 };
 
 static void task0_ball_track(void);
@@ -46,6 +48,7 @@ static void task1_line_track(void);
 static void task2_ball_seq(void);
 static void task3_line_ball(void);
 static void task4_a2b(void);
+static void task5_initcap_line(void);
 
 int main(void)
 {
@@ -59,11 +62,10 @@ int main(void)
     protocol_init(115200);
     tft180_init();
     tft180_clear();
-    for (volatile uint32_t d = 0; d < 4000000; d++);  /* DMP 预热延迟 */
+    for (volatile uint32_t d = 0; d < 4000000; d++);
     tick_start();
 
     uint8_t num = 0;
-    char    dis[16];
 
     tft180_set_color(RGB565_WHITE, RGB565_BLACK);
     tft180_clear();
@@ -82,25 +84,24 @@ int main(void)
         if (KEY_SHORT_PRESS == key_get_state(KEY_1)) {
             key_clear_state(KEY_1);
             switch (num) {
-            case 0: task0_ball_track(); break;
-            case 1: task1_line_track(); break;
-            case 2: task2_ball_seq();  break;
-            case 3: task4_a2b();       break;
-            case 4: task3_line_ball(); break;
+            case 0: task0_ball_track();    break;
+            case 1: task1_line_track();    break;
+            case 2: task2_ball_seq();      break;
+            case 3: task4_a2b();           break;
+            case 4: task3_line_ball();     break;
+            case 5: task5_initcap_line();  break;
             }
-            /* 任务返回, 恢复菜单 */
             tft180_set_color(RGB565_WHITE, RGB565_BLACK);
             tft180_clear();
             tft180_show_string(0, 0, "== Task ==");
             tft180_show_string(0, 24, (char *)task_names[num]);
         }
-
-        for (volatile uint32_t d = 0; d < 5000; d++);  /* 微延迟防过冲 */
+        for (volatile uint32_t d = 0; d < 5000; d++);
     }
 }
 
 /* ================================================================
- * task0: 小球追中心 (原版逻辑, 进任务后等确定再跑)
+ * task0: 小球追中心 (内联PID, 原版)
  * ================================================================ */
 static void task0_ball_track(void)
 {
@@ -223,27 +224,23 @@ static void task3_line_ball(void)
     servo_set_angle(90);
 
     mode_line_init();
-    mode_line_set_speed(413);         /* 590 × 0.7 */
+    mode_line_set_speed(413);
     mode_line_set_stop_frames(3);
 
     while (1) {
         uint32_t now = tick_get();
 
-        /* 小球平衡 (停车后不再控制) */
-        if (!mode_line_is_stopped())
-        {
+        if (!mode_line_is_stopped()) {
             float angle = ball_control_get_angle(&b);
             offset_t o = protocol_get();
 
-            if (o.updated)
-            {
+            if (o.updated) {
                 float dt = (float)(now - blt) * 0.001f;
                 if (dt <= 0.0f) dt = 0.01f;
                 blt = now;
                 ball_control_update(&b, o.dx, o.dy, o.found, dt);
                 angle = ball_control_get_angle(&b);
-                if (!ball_control_is_ok(&b))
-                {
+                if (!ball_control_is_ok(&b)) {
                     angle *= 0.95f;
                     if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
                 }
@@ -253,8 +250,7 @@ static void task3_line_ball(void)
 
         mode_line_update();
 
-        if (KEY_SHORT_PRESS == key_get_state(KEY_4))
-        {
+        if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
             key_clear_state(KEY_4);
             motor_stop();
             servo_set_angle(90);
@@ -271,6 +267,62 @@ static void task4_a2b(void)
     mode_a2b_init();
     while (1) {
         mode_a2b_update();
+        if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
+            key_clear_state(KEY_4);
+            motor_stop();
+            servo_set_angle(90);
+            return;
+        }
+    }
+}
+
+/* ================================================================
+ * task5: 抓初始位置 + 巡线一圈 + 小球追那个位置
+ * ================================================================ */
+static void task5_initcap_line(void)
+{
+    ball_control_t b;
+    uint32_t blt = tick_get();
+    char buf[40];
+
+    ball_control_init(&b);
+    servo_set_angle(90);
+
+    /* 抓球初始位置 */
+    float target = init_capture_run();
+    ball_control_set_target(&b, target);
+
+    sprintf(buf, "Cap: %d", (int)target);
+    tft180_show_string(0, 32, buf);
+
+    /* 巡线 + 追球 */
+    mode_line_init();
+    mode_line_set_speed(413);
+    mode_line_set_stop_frames(3);
+
+    while (1) {
+        uint32_t now = tick_get();
+
+        if (!mode_line_is_stopped()) {
+            float angle = ball_control_get_angle(&b);
+            offset_t o = protocol_get();
+
+            if (o.updated) {
+                float dt = (float)(now - blt) * 0.001f;
+                if (dt <= 0.0f) dt = 0.01f;
+                blt = now;
+                ball_control_update(&b, o.dx, o.dy, o.found, dt);
+                angle = ball_control_get_angle(&b);
+                if (!ball_control_is_ok(&b)) {
+                    angle *= 0.95f;
+                    if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
+                }
+            }
+            servo_set_angle((uint8_t)(90.0f + angle));
+        }
+
+        mode_line_update();
+
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
             key_clear_state(KEY_4);
             motor_stop();
