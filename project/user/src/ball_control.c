@@ -19,7 +19,7 @@
 #define DFL_SLEW_MAX    6.0f
 #define DFL_MAX_ANGLE   16.0f
 #define DFL_I_MAX       10.0f
-#define DFL_DB_INNER    20.0f
+#define DFL_DB_INNER    25.0f
 #define DFL_DB_OUTER    20.0f
 
 /* ================================================================ */

@@ -138,7 +138,6 @@ static void task1_line_track(void)
 {
     mode_line_init();
     mode_line_set_speed(590);
-    mode_line_set_stop_delay(100);
     while (1) {
         mode_line_update();
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) { key_clear_state(KEY_4); motor_stop(); return; }

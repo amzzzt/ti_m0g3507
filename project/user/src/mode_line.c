@@ -9,11 +9,9 @@
 
 static int base_speed    = 590;
 static int stop_frames    = 3;
-static int stop_delay_ms  = 300;
 
 void mode_line_set_speed(int s)       { base_speed    = s; }
 void mode_line_set_stop_frames(int n) { stop_frames   = n; }
-void mode_line_set_stop_delay(int ms) { stop_delay_ms = ms; }
 
 static uint32_t lap_start;
 static uint32_t follow_t0;
@@ -28,7 +26,6 @@ void mode_line_init(void)
 {
     base_speed    = 590;
     stop_frames   = 3;
-    stop_delay_ms = 300;
     tft180_show_string(0, 0, "Press KEY1");
     while (key_get_state(KEY_1) != KEY_SHORT_PRESS);
     key_clear_state(KEY_1);
@@ -98,11 +95,11 @@ void mode_line_update(void)
             motor_control_update(tgt_l, tgt_r);
         }
 
-        /* 检测到停车线后继续跑0.3秒再停 */
-        if (stop_pending && now - stop_t0 >= (uint32_t)stop_delay_ms) {
+        /* 检测到停车线立即停 */
+        if (stop_pending) {
             motor_stop();
             stopped  = 1;
-            lap_time = now - lap_start;     /* 冻结圈时 */
+            lap_time = now - lap_start;
         }
     }
 
