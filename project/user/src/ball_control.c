@@ -12,13 +12,13 @@
 #define DFL_V_DECAY     0.85f
 #define DFL_LOST_MAX    8
 
-#define DFL_KP          0.04f
-#define DFL_KI          0.10f
+#define DFL_KP          0.05f
+#define DFL_KI          0.15f
 #define DFL_KD          2.20f
 #define DFL_D_MAX       16.0f
 #define DFL_SLEW_MAX    6.0f
 #define DFL_MAX_ANGLE   16.0f
-#define DFL_I_MAX       8.0f
+#define DFL_I_MAX       10.0f
 #define DFL_DB_INNER    5.0f
 #define DFL_DB_OUTER    20.0f
 
