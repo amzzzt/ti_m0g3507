@@ -14,8 +14,9 @@
 #include "mode_a2b.h"
 #include "ball_seq.h"
 #include "init_capture.h"
+#include "ball_twopoint.h"
 
-#define TASK_COUNT  6
+#define TASK_COUNT  7
 
 static const char *task_names[TASK_COUNT] = {
     "0.Ball Ctrl",
@@ -24,6 +25,7 @@ static const char *task_names[TASK_COUNT] = {
     "3.A2B+Ball",
     "4.Line+Ball",
     "5.InitCap+Line",
+    "6.TwoPoint",
 };
 
 static void task0_ball_track(void);
@@ -32,6 +34,7 @@ static void task2_ball_seq(void);
 static void task3_line_ball(void);
 static void task4_a2b(void);
 static void task5_initcap_line(void);
+static void task6_twopoint(void);
 
 int main(void)
 {
@@ -73,6 +76,7 @@ int main(void)
             case 3: task4_a2b();           break;
             case 4: task3_line_ball();     break;
             case 5: task5_initcap_line();  break;
+            case 6: task6_twopoint();      break;
             }
             tft180_set_color(RGB565_WHITE, RGB565_BLACK);
             tft180_clear();
@@ -268,6 +272,22 @@ static void task5_initcap_line(void)
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
             key_clear_state(KEY_4);
             motor_stop();
+            servo_set_angle(90);
+            return;
+        }
+    }
+}
+
+/* ================================================================
+ * task6: 双点序列 +118(停1s) → -113(停1s)
+ * ================================================================ */
+static void task6_twopoint(void)
+{
+    ball_twopoint_init();
+    while (1) {
+        ball_twopoint_update();
+        if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
+            key_clear_state(KEY_4);
             servo_set_angle(90);
             return;
         }
