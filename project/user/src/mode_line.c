@@ -10,10 +10,12 @@
 static int base_speed    = 590;
 static int stop_frames    = 3;
 static int stop_delay_ms  = 300;
+static int ramp_ms        = 800;
 
 void mode_line_set_speed(int s)       { base_speed    = s; }
 void mode_line_set_stop_frames(int n) { stop_frames   = n; }
 void mode_line_set_stop_delay(int ms) { stop_delay_ms = ms; }
+void mode_line_set_ramp_ms(int ms)    { ramp_ms       = ms; }
 
 static uint32_t lap_start;
 static uint32_t follow_t0;
@@ -29,6 +31,7 @@ void mode_line_init(void)
     base_speed    = 590;
     stop_frames   = 3;
     stop_delay_ms = 300;
+    ramp_ms       = 800;
     tft180_show_string(0, 0, "Press KEY1");
     while (key_get_state(KEY_1) != KEY_SHORT_PRESS);
     key_clear_state(KEY_1);
@@ -74,9 +77,33 @@ void mode_line_update(void)
 {
     uint32_t now = tick_get();
 
+    /* === 速度斜坡 === */
     int dev = track_deviation();
-    int16_t tgt_l = (int16_t)(base_speed + dev);
-    int16_t tgt_r = (int16_t)(base_speed - dev);
+
+    /* 软起 f^2: 0 → 1 */
+    uint32_t elapsed = now - lap_start;
+    float ramp_up = 1.0f;
+    if (elapsed < (uint32_t)ramp_ms) {
+        float f = (float)elapsed / (float)ramp_ms;
+        ramp_up = f * f;
+    }
+
+    /* 软落 1-(1-f)^2: 1 → 0 */
+    float ramp_down = 1.0f;
+    if (stop_pending) {
+        uint32_t es = now - stop_t0;
+        if (es < (uint32_t)ramp_ms) {
+            float f = (float)es / (float)ramp_ms;
+            ramp_down = 1.0f - (1.0f - f) * (1.0f - f);
+        } else {
+            ramp_down = 0.0f;
+        }
+    }
+
+    float ramp = ramp_up * ramp_down;
+    int ramped = (int)((float)base_speed * ramp);
+    int16_t tgt_l = (int16_t)(ramped + dev);
+    int16_t tgt_r = (int16_t)(ramped - dev);
 
     if (!stopped) {
         /* 丢线检测: 8 路全白持续 500ms → 停车 */
@@ -95,14 +122,14 @@ void mode_line_update(void)
         }
 
         if (!stopped) {
-            motor_control_update(tgt_l, tgt_r);
-        }
-
-        /* 检测到停车线后继续跑0.3秒再停 */
-        if (stop_pending && now - stop_t0 >= (uint32_t)stop_delay_ms) {
-            motor_stop();
-            stopped  = 1;
-            lap_time = now - lap_start;     /* 冻结圈时 */
+            if (ramp_down <= 0.0f && stop_pending) {
+                /* 软落完成, 停车 */
+                motor_stop();
+                stopped  = 1;
+                lap_time = now - lap_start;
+            } else {
+                motor_control_update(tgt_l, tgt_r);
+            }
         }
     }
 
