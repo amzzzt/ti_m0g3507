@@ -12,15 +12,15 @@
 #define DFL_V_DECAY     0.85f
 #define DFL_LOST_MAX    8
 
-#define DFL_KP          0.06f
+#define DFL_KP          0.05f
 #define DFL_KI          0.15f
 #define DFL_KD          2.20f
 #define DFL_D_MAX       16.0f
 #define DFL_SLEW_MAX    6.0f
 #define DFL_MAX_ANGLE   16.0f
-#define DFL_I_MAX       3.0f
-#define DFL_DB_INNER    8.0f
-#define DFL_DB_OUTER    35.0f
+#define DFL_I_MAX       10.0f
+#define DFL_DB_INNER    25.0f
+#define DFL_DB_OUTER    20.0f
 
 /* ================================================================ */
 
@@ -138,10 +138,10 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                 if (ae < b->db_outer) {
                     /* 区2: 15~30 过渡带, 速度决定角度上限 */
                     float limit;
-                    if (av < 1.5f)       limit = 3.0f;
-                    else if (av < 3.0f)  limit = 4.0f;
-                    else if (av < 6.0f)  limit = 5.0f;
-                    else                 limit = 5.0f;
+                    if (av < 1.5f)       limit = 2.0f;
+                    else if (av < 3.0f)  limit = 3.0f;
+                    else if (av < 6.0f)  limit = 4.0f;
+                    else                 limit = 4.0f;
                     limit *= (ae - b->db_inner) / (b->db_outer - b->db_inner);
                     if (angle >  limit) angle =  limit;
                     if (angle < -limit) angle = -limit;
