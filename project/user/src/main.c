@@ -16,7 +16,7 @@
 #include "init_capture.h"
 #include "ball_twopoint.h"
 
-#define TASK_COUNT  7
+#define TASK_COUNT  8
 
 static const char *task_names[TASK_COUNT] = {
     "0.Ball Ctrl",
@@ -26,6 +26,7 @@ static const char *task_names[TASK_COUNT] = {
     "4.Line+Ball",
     "5.InitCap+Line",
     "6.TwoPoint",
+    "7.InitCap Ball",
 };
 
 static void task0_ball_track(void);
@@ -35,6 +36,7 @@ static void task3_line_ball(void);
 static void task4_a2b(void);
 static void task5_initcap_line(void);
 static void task6_twopoint(void);
+static void task7_initcap_ball(void);
 
 int main(void)
 {
@@ -76,7 +78,8 @@ int main(void)
             case 3: task4_a2b();           break;
             case 4: task3_line_ball();     break;
             case 5: task5_initcap_line();  break;
-            case 6: task6_twopoint();      break;
+            case 6: task6_twopoint();       break;
+            case 7: task7_initcap_ball();   break;
             }
             tft180_set_color(RGB565_WHITE, RGB565_BLACK);
             tft180_clear();
@@ -172,7 +175,7 @@ static void task3_line_ball(void)
     servo_set_angle(90);
 
     mode_line_init();
-    mode_line_set_speed(413);
+    mode_line_set_speed(364);
     mode_line_set_stop_frames(3);
 
     while (1) {
@@ -243,7 +246,7 @@ static void task5_initcap_line(void)
     tft180_show_string(0, 32, buf);
 
     mode_line_init();
-    mode_line_set_speed(413);
+    mode_line_set_speed(364);
     mode_line_set_stop_frames(3);
 
     while (1) {
@@ -290,6 +293,61 @@ static void task6_twopoint(void)
             key_clear_state(KEY_4);
             servo_set_angle(90);
             return;
+        }
+    }
+}
+
+/* ================================================================
+ * task7: 抓初始位置 → 纯球控追那个点
+ * ================================================================ */
+static void task7_initcap_ball(void)
+{
+    ball_control_t b;
+    uint32_t lt = tick_get();
+    char buf[80];
+
+    ball_control_init(&b);
+    servo_set_angle(90);
+
+    float target = init_capture_run();
+    ball_control_set_target(&b, target);
+
+    sprintf(buf, "Tgt: %d", (int)target);
+    tft180_show_string(0, 32, buf);
+
+    while (1) {
+        uint32_t now = tick_get();
+        float angle = ball_control_get_angle(&b);
+        offset_t o = protocol_get();
+
+        if (o.updated) {
+            float dt = (float)(now - lt) * 0.001f;
+            if (dt <= 0.0f) dt = 0.01f;
+            lt = now;
+            ball_control_update(&b, o.dx, o.dy, o.found, dt);
+            angle = ball_control_get_angle(&b);
+            if (!ball_control_is_ok(&b)) {
+                angle *= 0.95f;
+                if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
+            }
+        }
+
+        servo_set_angle((uint8_t)(90.0f + angle));
+
+        if (KEY_SHORT_PRESS == key_get_state(KEY_4)) {
+            key_clear_state(KEY_4);
+            servo_set_angle(90);
+            return;
+        }
+
+        static uint32_t pt = 0;
+        if (now - pt >= 50) {
+            pt = now;
+            sprintf(buf, "%d,%d,%d,%d,%d,%d,%d\r\n",
+                    (int)o.dx, (int)o.dy, (int)b.dx_f, (int)b.vx,
+                    (int)angle, ball_control_is_ok(&b),
+                    (int)b.target);
+            wireless_uart_send_string(buf);
         }
     }
 }

@@ -9,9 +9,11 @@
 
 static int base_speed    = 590;
 static int stop_frames    = 3;
+static int ramp_ms        = 3000;
 
 void mode_line_set_speed(int s)       { base_speed    = s; }
 void mode_line_set_stop_frames(int n) { stop_frames   = n; }
+void mode_line_set_ramp_ms(int ms)    { ramp_ms       = ms; }
 
 static uint32_t lap_start;
 static uint32_t follow_t0;
@@ -26,6 +28,7 @@ void mode_line_init(void)
 {
     base_speed    = 590;
     stop_frames   = 3;
+    ramp_ms       = 3000;
     tft180_show_string(0, 0, "Press KEY1");
     while (key_get_state(KEY_1) != KEY_SHORT_PRESS);
     key_clear_state(KEY_1);
@@ -71,9 +74,17 @@ void mode_line_update(void)
 {
     uint32_t now = tick_get();
 
+    /* 极致软起 f^2 */
     int dev = track_deviation();
-    int16_t tgt_l = (int16_t)(base_speed + dev);
-    int16_t tgt_r = (int16_t)(base_speed - dev);
+    uint32_t elapsed = now - lap_start;
+    float ramp = 1.0f;
+    if (elapsed < (uint32_t)ramp_ms) {
+        float f = (float)elapsed / (float)ramp_ms;
+        ramp = f;   /* 线性匀加速 */
+    }
+    int spd = (int)((float)base_speed * ramp);
+    int16_t tgt_l = (int16_t)(spd + dev);
+    int16_t tgt_r = (int16_t)(spd - dev);
 
     if (!stopped) {
         /* 丢线检测: 8 路全白持续 500ms → 停车 */

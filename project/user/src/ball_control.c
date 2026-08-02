@@ -14,10 +14,10 @@
 
 #define DFL_KP          0.065f
 #define DFL_KI          0.10f
-#define DFL_KD          2.90f
+#define DFL_KD          3.30f
 #define DFL_D_MAX       16.0f
-#define DFL_SLEW_MAX    6.0f
-#define DFL_MAX_ANGLE   16.0f
+#define DFL_SLEW_MAX    5.0f
+#define DFL_MAX_ANGLE   14.0f
 #define DFL_I_MAX       3.0f
 #define DFL_DB_INNER    8.0f
 #define DFL_DB_OUTER    80.0f
@@ -141,16 +141,13 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                     if (ratio > 1.0f) ratio = 1.0f;
                     if (ratio < 0.0f) ratio = 0.0f;
                     float lim;
-                    if (av < 1.5f)       lim = 10.0f;
-                    else if (av < 3.0f)  lim = 12.0f;
-                    else if (av < 6.0f)  lim = 14.0f;
-                    else                 lim = 14.0f;
+                    if (av < 1.5f)       lim = 8.0f;
+                    else if (av < 3.0f)  lim = 10.0f;
+                    else if (av < 6.0f)  lim = 12.0f;
+                    else                 lim = 12.0f;
                     lim *= ratio;
-                    int opposing = (error > 0 && angle < 0) || (error < 0 && angle > 0);
-                    if (opposing) {
-                        if (angle >  lim) angle =  lim;
-                        if (angle < -lim) angle = -lim;
-                    }
+                    if (angle >  lim) angle =  lim;
+                    if (angle < -lim) angle = -lim;
                 }
             }
 
