@@ -20,8 +20,8 @@
 #define DFL_SLEW_MAX    5.0f
 #define DFL_MAX_ANGLE   9.0f
 #define DFL_I_MAX       3.0f
-#define DFL_DB_INNER    8.0f
-#define DFL_DB_OUTER    80.0f
+#define DFL_DB_INNER    3.0f
+#define DFL_DB_OUTER    12.0f
 
 /* ================================================================ */
 
@@ -115,7 +115,7 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
             float av    = (b->vx > 0 ? b->vx : -b->vx);
 
             {
-                float db_in = (tick_get() - b->start_tick < 1500) ? 15.0f : b->db_inner;
+                float db_in = (tick_get() - b->start_tick < 1500) ? 8.0f : b->db_inner;
             if (ae < db_in) {
                 /* 区1: 不动区, angle=0, 积分衰减 */
                 angle    = 0.0f;
@@ -142,15 +142,15 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                 /* 反向力限幅: 全区间, 远处也限刹 */
                 {
                     uint32_t since_start = tick_get() - b->start_tick;
-                    float db_in = (since_start < 1500) ? 15.0f : b->db_inner;
+                    float db_in = (since_start < 1500) ? 8.0f : b->db_inner;
                     float ratio = (ae - db_in) / (b->db_outer - db_in);
                     if (ratio > 1.0f) ratio = 1.0f;
                     if (ratio < 0.0f) ratio = 0.0f;
                     float lim;
-                    if (av < 1.5f)       lim = 5.0f;
-                    else if (av < 3.0f)  lim = 7.0f;
-                    else if (av < 6.0f)  lim = 9.0f;
-                    else                 lim = 9.0f;
+                    if (av < 1.5f)       lim = 3.0f;
+                    else if (av < 3.0f)  lim = 3.0f;
+                    else if (av < 6.0f)  lim = 4.0f;
+                    else                 lim = 4.0f;
                     lim *= ratio;
                     if (since_start < 1500) lim *= 0.5f;  /* 启动期半幅 */
                     int opposing = (error > 0 && angle < 0) || (error < 0 && angle > 0);
