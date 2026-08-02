@@ -12,15 +12,15 @@
 #define DFL_V_DECAY     0.85f
 #define DFL_LOST_MAX    8
 
-#define DFL_KP          0.05f
+#define DFL_KP          0.065f
 #define DFL_KI          0.10f
-#define DFL_KD          2.20f
+#define DFL_KD          2.50f
 #define DFL_D_MAX       16.0f
 #define DFL_SLEW_MAX    6.0f
 #define DFL_MAX_ANGLE   16.0f
 #define DFL_I_MAX       3.0f
-#define DFL_DB_INNER    15.0f
-#define DFL_DB_OUTER    200.0f
+#define DFL_DB_INNER    8.0f
+#define DFL_DB_OUTER    80.0f
 
 /* ================================================================ */
 
@@ -135,21 +135,23 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                 if (angle >  b->max_angle) angle =  b->max_angle;
                 if (angle < -b->max_angle) angle = -b->max_angle;
 
-                if (ae < b->db_outer) {
-                    /* 区2: 只限制反向力, 正向力放行 */
-                    float limit;
-                    if (av < 1.5f)       limit = 6.0f;
-                    else if (av < 3.0f)  limit = 8.0f;
-                    else if (av < 6.0f)  limit = 10.0f;
-                    else                 limit = 10.0f;
-                    limit *= (ae - b->db_inner) / (b->db_outer - b->db_inner);
+                /* 反向力限幅: 全区间, 远处也限刹 */
+                {
+                    float ratio = (ae - b->db_inner) / (b->db_outer - b->db_inner);
+                    if (ratio > 1.0f) ratio = 1.0f;
+                    if (ratio < 0.0f) ratio = 0.0f;
+                    float lim;
+                    if (av < 1.5f)       lim = 10.0f;
+                    else if (av < 3.0f)  lim = 12.0f;
+                    else if (av < 6.0f)  lim = 14.0f;
+                    else                 lim = 14.0f;
+                    lim *= ratio;
                     int opposing = (error > 0 && angle < 0) || (error < 0 && angle > 0);
                     if (opposing) {
-                        if (angle >  limit) angle =  limit;
-                        if (angle < -limit) angle = -limit;
+                        if (angle >  lim) angle =  lim;
+                        if (angle < -lim) angle = -lim;
                     }
                 }
-                /* 区3: >30, 全PID 不做额外限制 */
             }
 
             /* SLEW 限幅 */
