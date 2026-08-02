@@ -199,11 +199,6 @@ static void task3_line_ball(void)
                     angle *= 0.95f;
                     if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
                 }
-                /* 前3秒极小幅调整 */
-                if (now - t0 < 3000) {
-                    if (angle >  3.0f) angle =  3.0f;
-                    if (angle < -3.0f) angle = -3.0f;
-                }
             }
             servo_set_angle((uint8_t)(90.0f + angle));
         }
@@ -277,10 +272,6 @@ static void task5_initcap_line(void)
                 if (!ball_control_is_ok(&b)) {
                     angle *= 0.95f;
                     if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
-                }
-                if (now - t0 < 3000) {
-                    if (angle >  3.0f) angle =  3.0f;
-                    if (angle < -3.0f) angle = -3.0f;
                 }
             }
             servo_set_angle((uint8_t)(90.0f + angle));
