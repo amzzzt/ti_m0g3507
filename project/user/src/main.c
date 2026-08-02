@@ -177,7 +177,7 @@ static void task3_line_ball(void)
     servo_set_angle(90);
 
     mode_line_init();
-    mode_line_set_speed(364);
+    mode_line_set_speed(393);
     mode_line_set_auto_stop_ms(-1);
 
     while (1) {
@@ -248,7 +248,7 @@ static void task5_initcap_line(void)
     tft180_show_string(0, 32, buf);
 
     mode_line_init();
-    mode_line_set_speed(364);
+    mode_line_set_speed(393);
     mode_line_set_auto_stop_ms(-1);
 
     while (1) {

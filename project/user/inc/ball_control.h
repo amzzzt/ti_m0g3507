@@ -45,6 +45,7 @@ void  ball_control_set_target(ball_control_t *b, float target);
 void  ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                           uint8_t found, float dt);
 float ball_control_get_angle(ball_control_t *b);
+
 int   ball_control_is_ok(ball_control_t *b);
 
 #endif
