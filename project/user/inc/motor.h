@@ -17,6 +17,7 @@ void motor_stop(void);
 
 /* 速度闭环 (motor+encoder+pid) */
 void    motor_control_init(void);
+void    motor_control_set_pwm_ramp_ms(int ms);
 void    motor_control_update(int16_t tgt_l, int16_t tgt_r);
 int16_t motor_control_left_speed(void);
 int16_t motor_control_right_speed(void);

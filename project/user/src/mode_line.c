@@ -10,13 +10,15 @@
 static int base_speed    = 590;
 static int stop_frames    = 3;
 static int stop_delay_ms  = 300;
-static int ramp_ms        = 3000;
+static int   ramp_ms      = 3000;
+static float ramp_exp      = 2.0f;
 static int auto_stop_ms   = 0;
 
 void mode_line_set_speed(int s)          { base_speed    = s; }
 void mode_line_set_stop_frames(int n)    { stop_frames   = n; }
 void mode_line_set_stop_delay(int ms)    { stop_delay_ms = ms; }
 void mode_line_set_ramp_ms(int ms)       { ramp_ms       = ms; }
+void mode_line_set_ramp_exp(float exp)   { ramp_exp      = exp; }
 void mode_line_set_auto_stop_ms(int ms)  { auto_stop_ms  = ms; }
 
 static uint32_t lap_start;
@@ -34,6 +36,7 @@ void mode_line_init(void)
     stop_frames   = 3;
     stop_delay_ms = 300;
     ramp_ms       = 3000;
+    ramp_exp      = 2.0f;
     auto_stop_ms  = 0;
     tft180_show_string(0, 0, "Press KEY1");
     while (key_get_state(KEY_1) != KEY_SHORT_PRESS);
@@ -87,7 +90,7 @@ void mode_line_update(void)
     float ramp = 1.0f;
     if (elapsed < (uint32_t)ramp_ms) {
         float f = (float)elapsed / (float)ramp_ms;
-        ramp = f * f;  /* f^2, 匀加速+加速度匀加 */
+        ramp = powf(f, ramp_exp);  /* f^exp, 可调指数 */
     }
     int spd = (int)((float)base_speed * ramp);
     int16_t tgt_l = (int16_t)(spd + dev);

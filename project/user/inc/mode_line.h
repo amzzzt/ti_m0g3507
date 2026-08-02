@@ -12,6 +12,7 @@ void mode_line_set_speed(int s);       /* 设置巡线速度 */
 void mode_line_set_stop_frames(int n); /* 设置停车检测帧数 */
 void mode_line_set_stop_delay(int ms); /* 检测后继续跑多久(ms) */
 void mode_line_set_ramp_ms(int ms);       /* 软起时长(ms) */
+void mode_line_set_ramp_exp(float exp);   /* 软起指数, 默认2.0 */
 void mode_line_set_auto_stop_ms(int ms);  /* 自动停车时长(ms), 0=关 */
 void mode_line_set_stop_delay(int ms); /* 检测后继续跑多久(ms) */
 

@@ -179,6 +179,9 @@ static void task3_line_ball(void)
     mode_line_init();
     mode_line_set_speed(393);
     mode_line_set_auto_stop_ms(-1);
+    ball_control_reset_tick(&b);
+    b.startup_ff    = -4.7f;
+    b.startup_ff_ms = 3000;
 
     while (1) {
         uint32_t now = tick_get();
@@ -250,6 +253,9 @@ static void task5_initcap_line(void)
     mode_line_init();
     mode_line_set_speed(393);
     mode_line_set_auto_stop_ms(-1);
+    ball_control_reset_tick(&b);
+    b.startup_ff    = -4.7f;
+    b.startup_ff_ms = 3000;
 
     while (1) {
         uint32_t now = tick_get();

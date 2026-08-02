@@ -57,6 +57,16 @@ void ball_control_init(ball_control_t *b)
     b->lost      = 0;
     b->ok        = 0;
     b->start_tick = tick_get();
+    b->startup_ff     = 0.0f;
+    b->startup_ff_ms  = 0;
+    b->startup_ff2       = 0.0f;
+    b->startup_ff2_ms    = 0;
+    b->startup_ff_decay_ms = 0;
+}
+
+void ball_control_reset_tick(ball_control_t *b)
+{
+    b->start_tick = tick_get();
 }
 
 void ball_control_set_target(ball_control_t *b, float target)
@@ -79,6 +89,29 @@ int ball_control_is_ok(ball_control_t *b)
 void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                          uint8_t found, float dt)
 {
+    /* 起步前馈期间: 纯前馈, 视觉 PID 不参与 */
+    if (b->startup_ff_ms > 0) {
+        uint32_t since = tick_get() - b->start_tick;
+        if (since < (uint32_t)b->startup_ff_ms) {
+            b->last_angle = b->startup_ff;
+            return;
+        }
+        if (b->startup_ff2_ms > 0 && since < (uint32_t)b->startup_ff2_ms) {
+            b->last_angle = b->startup_ff2;
+            return;
+        }
+        /* 衰减段 */
+        if (b->startup_ff_decay_ms > 0) {
+            uint32_t decay_end = (uint32_t)(b->startup_ff2_ms > 0 ? b->startup_ff2_ms : b->startup_ff_ms) + b->startup_ff_decay_ms;
+            if (since < decay_end) {
+                float last_ff = (b->startup_ff2_ms > 0) ? b->startup_ff2 : b->startup_ff;
+                float t = (float)(since - (b->startup_ff2_ms > 0 ? b->startup_ff2_ms : b->startup_ff_ms)) / (float)b->startup_ff_decay_ms;
+                b->last_angle = last_ff * (1.0f - t);
+                return;
+            }
+        }
+    }
+
     float angle = b->last_angle;   /* 默认保持 */
     int   valid = 0;
 

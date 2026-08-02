@@ -1,3 +1,4 @@
+
 /**
  * motor.c — TB6612 直流电机驱动 (TIMG7, 逐飞库)
  *
@@ -109,6 +110,16 @@ void motor_stop(void)
 static pid_t ctrl_pl, ctrl_pr;
 static uint32_t ctrl_last;
 
+/* PWM 起步限幅 */
+static uint32_t pwm_ramp_t0;
+static int      pwm_ramp_ms;
+
+void motor_control_set_pwm_ramp_ms(int ms)
+{
+    pwm_ramp_ms = ms;
+    pwm_ramp_t0 = tick_get();
+}
+
 void motor_control_init(void)
 {
     motor_init();
@@ -138,6 +149,19 @@ void motor_control_update(int16_t tgt_l, int16_t tgt_r)
     int pr = (int)((float)tgt_r * CTRL_KFF + or);
     if (pl >  8000) pl =  8000; if (pl < -8000) pl = -8000;
     if (pr >  8000) pr =  8000; if (pr < -8000) pr = -8000;
+
+    /* PWM 起步限幅: f¹ 线性 */
+    if (pwm_ramp_ms > 0) {
+        uint32_t el = tick_get() - pwm_ramp_t0;
+        if (el < (uint32_t)pwm_ramp_ms) {
+            int cap = (int)(8000.0f * (float)el / (float)pwm_ramp_ms);
+            if (pl >  cap) pl =  cap;
+            if (pl < -cap) pl = -cap;
+            if (pr >  cap) pr =  cap;
+            if (pr < -cap) pr = -cap;
+        }
+    }
+
     motor_left(pl);
     motor_right(pr);
 }

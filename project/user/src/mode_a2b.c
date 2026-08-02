@@ -15,7 +15,7 @@
 
 #define BASE_SPEED  450
 #define AUTO_STOP_MS 7500
-#define RAMP_MS     800    /* 起跑/停车缓加速总时长 */
+#define RAMP_MS     1000   /* 起跑/停车缓加速总时长 */
 
 typedef enum {
     S_WAIT_KEY,
@@ -65,20 +65,27 @@ void mode_a2b_update(void)
             st = S_FOLLOW;
             t0 = now;
             lap_start = now;
+            ball_control_reset_tick(&ball);
+            ball.startup_ff     = -7.0f;
+            ball.startup_ff_ms  = 400;
+            ball.startup_ff2       = -20.0f;
+            ball.startup_ff2_ms    = 1000;
+            ball.startup_ff_decay_ms = 500;
+            motor_control_set_pwm_ramp_ms(1000);
             tft180_show_string(0, 0, "FOLLOW   ");
         }
         break;
 
     case S_FOLLOW: {
-        /* 起跑/停车缓加速, 二次曲线: 前慢后快, 减少小球晃动 */
+        /* 起跑/停车缓加速, f² */
         float ramp;
         uint32_t elapsed = now - t0;
         if (elapsed < RAMP_MS) {
             float f = (float)elapsed / (float)RAMP_MS;
-            ramp = f * f;                              /* 起跑: 越往后越快 */
+            ramp = f * f;                                /* 起跑: f² */
         } else if (elapsed > AUTO_STOP_MS - RAMP_MS) {
             float f = (float)(AUTO_STOP_MS - elapsed) / (float)RAMP_MS;
-            ramp = 1.0f - (1.0f - f) * (1.0f - f);    /* 停车: 越往后降得越快 */
+            ramp = 1.0f - (1.0f - f) * (1.0f - f);
             if (ramp < 0.0f) ramp = 0.0f;
         } else {
             ramp = 1.0f;

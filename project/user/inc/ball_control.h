@@ -25,6 +25,11 @@ typedef struct {
     float   i_max;          // 积分限幅 (°)
     float   db_inner;       // 不动区边界 (px)
     float   db_outer;       // 出手区边界 (px)
+    float   startup_ff;     // 起步前馈角 (°) 第一段
+    int     startup_ff_ms;  // 第一段时长 (ms)
+    float   startup_ff2;    // 第二段角度
+    int     startup_ff2_ms; // 第二段结束时刻 (ms)
+    int     startup_ff_decay_ms; // 衰减时长 (ms)
 
     /* === 目标位置 === */
     float   target;         // 目标球位置 (默认 0=居中)
@@ -41,6 +46,7 @@ typedef struct {
 } ball_control_t;
 
 void  ball_control_init(ball_control_t *b);
+void  ball_control_reset_tick(ball_control_t *b);
 void  ball_control_set_target(ball_control_t *b, float target);
 void  ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                           uint8_t found, float dt);
