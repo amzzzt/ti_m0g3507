@@ -145,6 +145,8 @@ static void task1_line_track(void)
 {
     mode_line_init();
     mode_line_set_speed(590);
+    mode_line_set_ramp_ms(0);
+    mode_line_set_stop_delay(0);
     while (1) {
         mode_line_update();
         if (KEY_SHORT_PRESS == key_get_state(KEY_4)) { key_clear_state(KEY_4); motor_stop(); return; }
@@ -177,6 +179,8 @@ static void task3_line_ball(void)
     mode_line_init();
     mode_line_set_speed(364);
     mode_line_set_stop_frames(3);
+    mode_line_set_auto_stop_ms(33000);
+    { uint32_t t0 = tick_get();  /* 记录启动时刻 */
 
     while (1) {
         uint32_t now = tick_get();
@@ -195,6 +199,11 @@ static void task3_line_ball(void)
                     angle *= 0.95f;
                     if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
                 }
+                /* 前3秒极小幅调整 */
+                if (now - t0 < 3000) {
+                    if (angle >  3.0f) angle =  3.0f;
+                    if (angle < -3.0f) angle = -3.0f;
+                }
             }
             servo_set_angle((uint8_t)(90.0f + angle));
         }
@@ -207,6 +216,7 @@ static void task3_line_ball(void)
             servo_set_angle(90);
             return;
         }
+    }
     }
 }
 
@@ -248,6 +258,8 @@ static void task5_initcap_line(void)
     mode_line_init();
     mode_line_set_speed(364);
     mode_line_set_stop_frames(3);
+    mode_line_set_auto_stop_ms(33000);
+    { uint32_t t0 = tick_get();
 
     while (1) {
         uint32_t now = tick_get();
@@ -266,6 +278,10 @@ static void task5_initcap_line(void)
                     angle *= 0.95f;
                     if (angle < 0.5f && angle > -0.5f) angle = 0.0f;
                 }
+                if (now - t0 < 3000) {
+                    if (angle >  3.0f) angle =  3.0f;
+                    if (angle < -3.0f) angle = -3.0f;
+                }
             }
             servo_set_angle((uint8_t)(90.0f + angle));
         }
@@ -278,6 +294,7 @@ static void task5_initcap_line(void)
             servo_set_angle(90);
             return;
         }
+    }
     }
 }
 
