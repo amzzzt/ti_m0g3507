@@ -14,7 +14,7 @@
 
 #define DFL_KP          0.065f
 #define DFL_KI          0.10f
-#define DFL_KD          2.80f
+#define DFL_KD          2.90f
 #define DFL_D_MAX       16.0f
 #define DFL_SLEW_MAX    6.0f
 #define DFL_MAX_ANGLE   16.0f
