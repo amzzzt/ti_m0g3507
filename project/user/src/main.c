@@ -254,8 +254,13 @@ static void task5_initcap_line(void)
     mode_line_set_speed(393);
     mode_line_set_auto_stop_ms(-1);
     ball_control_reset_tick(&b);
-    b.startup_ff    = -4.7f;
-    b.startup_ff_ms = 3000;
+    if (target > 50) {
+        b.startup_ff = -5.09f; b.startup_ff_ms = 2600;  b.startup_ff2 = -5.09f; b.startup_ff2_ms = 2600; b.startup_ff_decay_ms = 200;
+    } else if (target < -50) {
+        b.startup_ff = -3.55f; b.startup_ff_ms = 2400;  b.startup_ff2 = -3.55f; b.startup_ff2_ms = 2400; b.startup_ff_decay_ms = 200;
+    } else {
+        b.startup_ff = -4.25f;  b.startup_ff_ms = 3100;
+    }
 
     while (1) {
         uint32_t now = tick_get();
