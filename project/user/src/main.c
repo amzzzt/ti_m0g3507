@@ -254,12 +254,26 @@ static void task5_initcap_line(void)
     mode_line_set_speed(393);
     mode_line_set_auto_stop_ms(-1);
     ball_control_reset_tick(&b);
-    if (target > 50) {
-        b.startup_ff = -5.09f; b.startup_ff_ms = 2600;  b.startup_ff2 = -5.09f; b.startup_ff2_ms = 2600; b.startup_ff_decay_ms = 200;
-    } else if (target < -50) {
-        b.startup_ff = -3.55f; b.startup_ff_ms = 2400;  b.startup_ff2 = -3.55f; b.startup_ff2_ms = 2400; b.startup_ff_decay_ms = 200;
-    } else {
-        b.startup_ff = -4.25f;  b.startup_ff_ms = 3100;
+    /* 三锚点线性插值: -133, 0, +133, 范围 ±220 */
+    {
+        float abs_t = (target > 0 ? target : -target);
+        float ratio = (abs_t > 220.0f) ? 1.0f : (abs_t / 220.0f);
+        float scale = (target > 0) ? 0.77f : (target < 0 ? 0.68f : 1.0f);
+        if (target > 0) {
+            b.startup_ff    = -4.25f + (-5.09f + 4.25f) * ratio * scale;
+            b.startup_ff_ms = (int)(3100.0f + (2600.0f - 3100.0f) * ratio * scale);
+        } else if (target < 0) {
+            b.startup_ff    = -4.25f + (-3.55f + 4.25f) * ratio * scale;
+            b.startup_ff_ms = (int)(3100.0f + (2400.0f - 3100.0f) * ratio * scale);
+        } else {
+            b.startup_ff    = -4.25f;
+            b.startup_ff_ms = 3100;
+        }
+        if (ratio > 0.0f) {
+            b.startup_ff2    = b.startup_ff;
+            b.startup_ff2_ms = b.startup_ff_ms;
+            b.startup_ff_decay_ms = 200;
+        }
     }
 
     while (1) {
