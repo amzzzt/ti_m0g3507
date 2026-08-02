@@ -154,7 +154,8 @@ void motor_control_update(int16_t tgt_l, int16_t tgt_r)
     if (pwm_ramp_ms > 0) {
         uint32_t el = tick_get() - pwm_ramp_t0;
         if (el < (uint32_t)pwm_ramp_ms) {
-            int cap = (int)(8000.0f * (float)el / (float)pwm_ramp_ms);
+            float f = (float)el / (float)pwm_ramp_ms;
+            int cap = (int)(8000.0f * f * f * f);
             if (pl >  cap) pl =  cap;
             if (pl < -cap) pl = -cap;
             if (pr >  cap) pr =  cap;

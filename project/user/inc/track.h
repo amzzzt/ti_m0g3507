@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 void track_init(void);
+void track_reset(void);              /* 重置偏差状态 */
 void track_read_all(void);           /* 读8路, 约400us */
 int  track_deviation(void);          /* 加权偏差 -400~+400 */
 int  track_value(uint8_t ch);        /* 读单路值 1=黑 0=白 (2帧滤波) */

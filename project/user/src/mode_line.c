@@ -47,6 +47,7 @@ void mode_line_init(void)
     uint32_t t0 = tick_get();
     while (tick_get() - t0 < 2000);
 
+    track_reset();
     lap_start = tick_get();
     follow_t0 = lap_start;
     stopped      = 0;

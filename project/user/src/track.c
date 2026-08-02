@@ -60,21 +60,28 @@ int track_value_raw(uint8_t ch) {
     return (int)hist[ch][0];   /* 不经过2帧滤波, 0=黑 1=白 */
 }
 
-int track_deviation(void) {
-    static int last_raw = 0;
-    static uint32_t lost_since = 0;
-    static float dev_f = 0;
+static int       dev_last_raw = 0;
+static uint32_t  dev_lost_since = 0;
+static float     dev_f = 0;
 
-    /* 少数有效: 0=线, 1=背景 */
+void track_reset(void) {
+    dev_last_raw   = 0;
+    dev_lost_since = tick_get();  /* 避免首帧立即触发超时 */
+    dev_f          = 0;
+}
+
+int track_deviation(void) {
+
+    /* 少数有效: 0=线, 1=背景 (用原始值避免2帧确认冻结) */
     int sum_p = 0, sum_n = 0;
     for (int i = 0; i < 8; i++) {
-        if (g_val[i] == 1) sum_n++;
+        if (hist[i][0] == 1) sum_n++;
     }
     int target = (sum_n > 4) ? 0 : 1;   /* 少数色是线 */
 
     sum_p = 0; sum_n = 0;
     for (int i = 0; i < 8; i++) {
-        if (g_val[i] == target) { sum_p += i; sum_n++; }
+        if (hist[i][0] == target) { sum_p += i; sum_n++; }
     }
 
     int raw;
@@ -83,12 +90,12 @@ int track_deviation(void) {
         raw = (int)((center - 3.5f) * 95.0f);
         if (raw >  340) raw =  340;
         if (raw < -340) raw = -340;
-        last_raw = raw;
-        lost_since = tick_get();
+        dev_last_raw = raw;
+        dev_lost_since = tick_get();
     } else {
         /* 丢线: 保持旧值, >300ms归零 */
-        if (tick_get() - lost_since > 300) { raw = 0; last_raw = 0; }
-        else raw = last_raw;
+        if (tick_get() - dev_lost_since > 500) { raw = 0; dev_last_raw = 0; }
+        else raw = dev_last_raw;
     }
 
     dbg_sum_n = sum_n;

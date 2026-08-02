@@ -14,7 +14,7 @@
 #include "mode_a2b.h"
 
 #define BASE_SPEED  450
-#define AUTO_STOP_MS 7500
+#define AUTO_STOP_MS 7700
 #define RAMP_MS     1000   /* 起跑/停车缓加速总时长 */
 
 typedef enum {
@@ -68,7 +68,7 @@ void mode_a2b_update(void)
             ball_control_reset_tick(&ball);
             ball.startup_ff     = -7.0f;
             ball.startup_ff_ms  = 400;
-            ball.startup_ff2       = -20.0f;
+            ball.startup_ff2       = -15.5f;
             ball.startup_ff2_ms    = 1000;
             ball.startup_ff_decay_ms = 500;
             motor_control_set_pwm_ramp_ms(1000);

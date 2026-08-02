@@ -177,11 +177,12 @@ static void task3_line_ball(void)
     servo_set_angle(90);
 
     mode_line_init();
-    mode_line_set_speed(393);
+    mode_line_set_speed(413);
     mode_line_set_auto_stop_ms(-1);
     ball_control_reset_tick(&b);
-    b.startup_ff    = -4.7f;
-    b.startup_ff_ms = 3000;
+    b.startup_ff    = -4.35f;
+    b.startup_ff_ms = 2890;
+    b.kp = 0.0702f;
 
     while (1) {
         uint32_t now = tick_get();
@@ -251,7 +252,7 @@ static void task5_initcap_line(void)
     tft180_show_string(0, 32, buf);
 
     mode_line_init();
-    mode_line_set_speed(393);
+    mode_line_set_speed(413);
     mode_line_set_auto_stop_ms(-1);
     ball_control_reset_tick(&b);
     /* 三锚点线性插值: -133, 0, +133, 范围 ±220 */
@@ -261,13 +262,13 @@ static void task5_initcap_line(void)
         float scale = (target > 0) ? 0.77f : (target < 0 ? 0.68f : 1.0f);
         if (target > 0) {
             b.startup_ff    = -4.25f + (-5.09f + 4.25f) * ratio * scale;
-            b.startup_ff_ms = (int)(3100.0f + (2600.0f - 3100.0f) * ratio * scale);
+            b.startup_ff_ms = (int)(3255.0f + (2730.0f - 3255.0f) * ratio * scale);
         } else if (target < 0) {
             b.startup_ff    = -4.25f + (-3.55f + 4.25f) * ratio * scale;
-            b.startup_ff_ms = (int)(3100.0f + (2400.0f - 3100.0f) * ratio * scale);
+            b.startup_ff_ms = (int)(3255.0f + (2520.0f - 3255.0f) * ratio * scale);
         } else {
             b.startup_ff    = -4.25f;
-            b.startup_ff_ms = 3100;
+            b.startup_ff_ms = 3255;
         }
         if (ratio > 0.0f) {
             b.startup_ff2    = b.startup_ff;
@@ -275,6 +276,7 @@ static void task5_initcap_line(void)
             b.startup_ff_decay_ms = 200;
         }
     }
+    b.kp = 0.0702f;
 
     while (1) {
         uint32_t now = tick_get();
