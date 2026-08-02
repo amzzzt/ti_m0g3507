@@ -1,5 +1,5 @@
 /**
- * ball_seq.c — 小球序列: 固定抬升→+118 → 等1s → 追-113
+ * ball_seq.c — 小球序列: 固定抬升 → 追+133(2s) → 追-133(3s)
  */
 #include "zf_common_headfile.h"
 #include "zf_device_wireless_uart.h"
@@ -11,16 +11,17 @@
 
 static ball_control_t b;
 static uint32_t lt;
-static uint8_t  st = 0, settle = 0;
-static uint32_t kick_t0;
+static uint8_t  st = 0;
+static uint32_t phase_t0;
 
-enum { S_KICK, S_PAUSE, S_WAIT, S_TO_N118 };
+enum { S_TO_P133, S_TO_N133 };
 
 void ball_seq_init(void)
 {
     lt = tick_get();
 
     ball_control_init(&b);
+    ball_control_set_target(&b, 133.0f);
     servo_set_angle(90);
 
     /* 等 KEY1 + 2s */
@@ -31,11 +32,10 @@ void ball_seq_init(void)
     key_clear_state(KEY_1);
     tft180_show_string(0, 0, "Wait 2s...");
     { uint32_t w0 = tick_get(); while (tick_get() - w0 < 2000); }
+    tft180_show_string(0, 0, "GO +133 ");
 
-    /* 固定抬升: 左倾推球向右到+118区域, 持续300ms */
-    st = S_KICK;
-    kick_t0 = tick_get();
-    servo_set_angle(77);   /* 90-13=77°, 左倾 */
+    st = S_TO_P133;
+    phase_t0 = tick_get();
 }
 
 void ball_seq_update(void)
@@ -45,7 +45,15 @@ void ball_seq_update(void)
     offset_t o = protocol_get();
     char buf[64];
 
-    if (o.updated && st >= S_WAIT) {
+    if (o.updated && st >= S_TO_P133) {
+        /* 不对称 PID: 追正目标强力, 追负目标(近舵机)柔和 */
+        if (b.target > 0) {
+            b.kp = 0.082f;  b.kd = 3.3f;  b.max_angle = 10.0f;  b.d_max = 16.0f;
+            b.ki = 0.10f;   b.i_max = 3.0f;
+        } else {
+            b.kp = 0.060f;  b.kd = 8.0f;  b.max_angle = 7.0f;   b.d_max = 20.0f;
+            b.ki = 0.12f;   b.i_max = 4.0f;
+        }
         float dt = (float)(now - lt) * 0.001f; if (dt <= 0.0f) dt = 0.01f;
         lt = now;
         ball_control_update(&b, o.dx, o.dy, o.found, dt);
@@ -54,37 +62,32 @@ void ball_seq_update(void)
     }
 
     switch (st) {
-    case S_KICK:
-        if (now - kick_t0 >= 300) {
-            servo_set_angle(90);
-            st = S_PAUSE;
-            kick_t0 = now;
+    case S_TO_P133:
+        if (now - phase_t0 >= 2420) {
+            ball_control_set_target(&b, -133.0f);
+            st = S_TO_N133;
+            phase_t0 = now;
         }
         break;
-    case S_PAUSE:
-        if (now - kick_t0 >= 300) {
-            ball_control_set_target(&b, -113.0f);
-            st = S_WAIT;
-            kick_t0 = now;
+    case S_TO_N133:
+        if (now - phase_t0 >= 3000) {
+            /* hold at -133 */
         }
-        break;
-    case S_WAIT:
-        if (now - kick_t0 >= 1000) {
-            st = S_TO_N118;
-        }
-        break;
-    case S_TO_N118:
         break;
     }
 
-    if (st >= S_WAIT)
+    if (st >= S_TO_P133)
         servo_set_angle((uint8_t)(90.0f + angle));
 
     static uint32_t pt = 0;
     if (now - pt >= 200) {
         pt = now;
-        sprintf(buf, "S:%d dx:%d vx:%d ang:%d ok:%d\r\n",
-                (int)st, (int)b.dx_f, (int)b.vx, (int)angle, ball_control_is_ok(&b));
+        sprintf(buf, "S:%d dx:%d vx:%d ang:%d ok:%d tgt:%d\r\n",
+                (int)st, (int)b.dx_f, (int)b.vx, (int)angle,
+                ball_control_is_ok(&b), (int)b.target);
         wireless_uart_send_string(buf);
+        char ds[16];
+        sprintf(ds, "S%d T%d  ", (int)st, (int)b.target);
+        tft180_show_string(0, 1, ds);
     }
 }
