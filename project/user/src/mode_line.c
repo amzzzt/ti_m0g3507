@@ -56,7 +56,7 @@ void mode_line_init(void)
 void mode_line_stop_isr(void)
 {
     if (stopped || stop_pending) return;
-    if (auto_stop_ms > 0) return;  /* 自动停车模式, 禁用灰度检测 */
+    if (auto_stop_ms != 0) return;  /* 非0=禁用灰度停车 */
 
     uint32_t elapsed = tick_get() - lap_start;
     if (elapsed < 15000) return;
@@ -87,7 +87,7 @@ void mode_line_update(void)
     float ramp = 1.0f;
     if (elapsed < (uint32_t)ramp_ms) {
         float f = (float)elapsed / (float)ramp_ms;
-        ramp = f * sqrtf(f);  /* f^1.5 柔起步, 首秒19% */
+        ramp = f * f;  /* f^2, 匀加速+加速度匀加 */
     }
     int spd = (int)((float)base_speed * ramp);
     int16_t tgt_l = (int16_t)(spd + dev);
@@ -101,7 +101,8 @@ void mode_line_update(void)
             lap_time = now - lap_start;
         }
 
-        /* 丢线检测: 8 路全白持续 500ms → 停车 */
+        /* 丢线检测: 8 路全白持续 500ms → 停车 (仅灰度模式) */
+        if (auto_stop_ms == 0) {
         int seen = 0;
         for (int i = 0; i < 8; i++)
             if (track_value_raw(i) == 0) { seen = 1; break; }
@@ -115,6 +116,7 @@ void mode_line_update(void)
         } else {
             lost_t0 = 0;
         }
+        } /* auto_stop_ms==0 */
 
         if (!stopped) {
             motor_control_update(tgt_l, tgt_r);

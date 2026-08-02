@@ -37,6 +37,7 @@ typedef struct {
     int16_t raw_prev;       // 上一帧原始值 (跳变检测)
     uint8_t lost;           // 连续丢帧计数
     int     ok;             // 1=已锁定目标
+    uint32_t start_tick;    // 启动时刻
 } ball_control_t;
 
 void  ball_control_init(ball_control_t *b);

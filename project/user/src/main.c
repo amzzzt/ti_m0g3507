@@ -178,9 +178,7 @@ static void task3_line_ball(void)
 
     mode_line_init();
     mode_line_set_speed(364);
-    mode_line_set_stop_frames(3);
-    mode_line_set_auto_stop_ms(33000);
-    { uint32_t t0 = tick_get();  /* 记录启动时刻 */
+    mode_line_set_auto_stop_ms(-1);
 
     while (1) {
         uint32_t now = tick_get();
@@ -211,7 +209,6 @@ static void task3_line_ball(void)
             servo_set_angle(90);
             return;
         }
-    }
     }
 }
 
@@ -252,9 +249,7 @@ static void task5_initcap_line(void)
 
     mode_line_init();
     mode_line_set_speed(364);
-    mode_line_set_stop_frames(3);
-    mode_line_set_auto_stop_ms(33000);
-    { uint32_t t0 = tick_get();
+    mode_line_set_auto_stop_ms(-1);
 
     while (1) {
         uint32_t now = tick_get();
@@ -285,7 +280,6 @@ static void task5_initcap_line(void)
             servo_set_angle(90);
             return;
         }
-    }
     }
 }
 

@@ -4,6 +4,7 @@
  *   从 main.c 完整迁移, 增加 setpoint 支持 (target 默认 0=居中)
  */
 #include "ball_control.h"
+#include "tick.h"
 
 /* ========== 默认参数 ========== */
 #define DFL_ALPHA_POS   0.70f
@@ -12,9 +13,9 @@
 #define DFL_V_DECAY     0.85f
 #define DFL_LOST_MAX    8
 
-#define DFL_KP          0.065f
-#define DFL_KI          0.10f
-#define DFL_KD          3.30f
+#define DFL_KP          0.0650f
+#define DFL_KI          0.1000f
+#define DFL_KD          3.3000f
 #define DFL_D_MAX       16.0f
 #define DFL_SLEW_MAX    5.0f
 #define DFL_MAX_ANGLE   9.0f
@@ -52,9 +53,10 @@ void ball_control_init(ball_control_t *b)
     b->vx       = 0.0f;
     b->integral = 0.0f;
     b->last_angle = 0.0f;
-    b->raw_prev = 0;
-    b->lost     = 0;
-    b->ok       = 0;
+    b->raw_prev  = 0;
+    b->lost      = 0;
+    b->ok        = 0;
+    b->start_tick = tick_get();
 }
 
 void ball_control_set_target(ball_control_t *b, float target)
@@ -112,7 +114,9 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
             float ae    = (error > 0 ? error : -error);
             float av    = (b->vx > 0 ? b->vx : -b->vx);
 
-            if (ae < b->db_inner) {
+            {
+                float db_in = (tick_get() - b->start_tick < 1500) ? 15.0f : b->db_inner;
+            if (ae < db_in) {
                 /* 区1: 不动区, angle=0, 积分衰减 */
                 angle    = 0.0f;
                 b->integral *= 0.85f;
@@ -137,7 +141,9 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
 
                 /* 反向力限幅: 全区间, 远处也限刹 */
                 {
-                    float ratio = (ae - b->db_inner) / (b->db_outer - b->db_inner);
+                    uint32_t since_start = tick_get() - b->start_tick;
+                    float db_in = (since_start < 1500) ? 15.0f : b->db_inner;
+                    float ratio = (ae - db_in) / (b->db_outer - db_in);
                     if (ratio > 1.0f) ratio = 1.0f;
                     if (ratio < 0.0f) ratio = 0.0f;
                     float lim;
@@ -146,6 +152,7 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                     else if (av < 6.0f)  lim = 9.0f;
                     else                 lim = 9.0f;
                     lim *= ratio;
+                    if (since_start < 1500) lim *= 0.5f;  /* 启动期半幅 */
                     int opposing = (error > 0 && angle < 0) || (error < 0 && angle > 0);
                     if (opposing) {
                         if (angle >  lim) angle =  lim;
@@ -153,6 +160,7 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                     }
                 }
             }
+            } /* startup db_in block */
 
             /* SLEW 限幅 */
             float delta = angle - b->last_angle;
