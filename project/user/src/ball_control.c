@@ -146,8 +146,11 @@ void ball_control_update(ball_control_t *b, int16_t dx, int16_t dy,
                     else if (av < 6.0f)  lim = 12.0f;
                     else                 lim = 12.0f;
                     lim *= ratio;
-                    if (angle >  lim) angle =  lim;
-                    if (angle < -lim) angle = -lim;
+                    int opposing = (error > 0 && angle < 0) || (error < 0 && angle > 0);
+                    if (opposing) {
+                        if (angle >  lim) angle =  lim;
+                        if (angle < -lim) angle = -lim;
+                    }
                 }
             }
 
